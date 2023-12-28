@@ -193,16 +193,32 @@ class API:
             data=None,
             json=None
     ) -> Optional[Dict]:
+        if self.account_data:
+            if expiration := self.account_data.expires:
+                current_time = utils.get_date()
+                if current_time > utils.str_to_date(expiration):
+                    self.create_session(refresh=True)
+        r = self._process_request(method, url, headers, params, data, json)
+        if r.status_code == 401:
+            self.create_session(refresh=True)
+            r = self._process_request(method, url, headers, params, data, json)
+        return utils.get_json_from_response(r)
+
+    def _process_request(
+            self,
+            method: str,
+            url: str,
+            headers=None,
+            params=None,
+            data=None,
+            json=None
+    ) -> Optional[Dict]:
         if params is None:
             params = dict()
         if headers is None:
             headers = dict()
         utils.log("Request: %s - Params: %s" % (url, params))
         if self.account_data:
-            if expiration := self.account_data.expires:
-                current_time = utils.get_date()
-                if current_time > utils.str_to_date(expiration):
-                    self.create_session(refresh=True)
             params.update({
                 "Policy": self.account_data.cms.policy,
                 "Signature": self.account_data.cms.signature,
@@ -210,7 +226,7 @@ class API:
             })
         headers.update(self.api_headers)
 
-        r = self.http.request(
+        return self.http.request(
             method,
             url,
             headers=headers,
@@ -218,7 +234,6 @@ class API:
             data=data,
             json=json
         )
-        return utils.get_json_from_response(r)
 
     def get_storage_path(self) -> str:
         """Get cookie file path

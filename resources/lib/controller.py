@@ -29,7 +29,7 @@ from requests import ConnectionError
 from . import utils
 from . import view
 from .api import API
-from .model import EpisodeData, MovieData
+from .model import Object, EpisodeData, SeriesData, MovieData
 
 
 def show_queue(args, api: API):
@@ -59,13 +59,8 @@ def show_queue(args, api: API):
         #    continue
 
         try:
-            if item.get("panel").get("type") == "episode":
-                entry = EpisodeData(item)
-            elif item["panel"]["type"] == "movie":
-                entry = MovieData(item)
-            else:
-                utils.crunchy_log(args, "queue | unhandled index for metadata. %s" % (json.dumps(item, indent=4)),
-                                  xbmc.LOGERROR)
+            entry = get_raw_panel_from_dict(item)
+            if not entry:
                 continue
 
             view.add_item(
@@ -212,63 +207,19 @@ def show_history(args, api: API):
     num_pages = int(math.ceil(req["total"] / items_per_page))
 
     series_ids = [item.get("panel").get("episode_metadata").get("series_id") if item.get("panel") and item.get("panel").get("episode_metadata") and item.get("panel").get("episode_metadata").get("series_id") else "0" for item in req.get("data")]
-    series_data = get_series_data_from_series_ids(args, series_ids, api)
+    series_data = get_data_from_object_ids(args, series_ids, api)
 
     for item in req.get("data"):
         try:
-            # skip episodes completely that don't have at least the type information
-            # @see https://github.com/smirgol/plugin.video.crunchyroll/issues/8
-            if not item.get('panel') or not item.get('panel').get('type'):
-                continue
-
-            if item.get("panel").get("type") == "episode":
-                entry = EpisodeData(item)
-            elif item.get("panel").get("type") == "movie":
-                entry = MovieData(item)
-            else:
-                utils.crunchy_log(args, "history | unhandled index for metadata. %s" % (json.dumps(item, indent=4)),
-                                  xbmc.LOGERROR)
+            entry = get_raw_panel_from_dict(item)
+            if not entry:
                 continue
 
             series_obj = None
-            poster = entry.thumb
-            fanart = entry.fanart
             if entry.series_id:
                 series_obj = series_data.get(entry.series_id)
-                if series_obj:
-                    poster = utils.get_image_from_struct(series_obj, "poster_tall", 2)
-                    fanart = utils.get_image_from_struct(series_obj, "poster_wide", 2)
-                else:
-                    utils.log("Cannot retrieve series %s" % entry.series_id)
 
-            # add to view
-            view.add_item(
-                args,
-                {
-                    "title": entry.title,
-                    "tvshowtitle": entry.tvshowtitle,
-                    "duration": entry.duration,
-                    "playcount": entry.playcount,
-                    "season": entry.season,
-                    "episode": entry.episode,
-                    "episode_id": entry.episode_id,
-                    "collection_id": entry.collection_id,
-                    "series_id": entry.series_id,
-                    "plot": entry.plot,
-                    "plotoutline": entry.plotoutline,
-                    "genre": "",  # no longer available
-                    "year": entry.year,
-                    "aired": entry.aired,
-                    "premiered": entry.premiered,
-                    "thumb": entry.thumb,
-                    "poster": poster,
-                    "fanart": fanart,
-                    "stream_id": entry.stream_id,
-                    "playhead": entry.playhead,
-                    "mode": "videoplay"
-                },
-                is_folder=False
-            )
+            add_episode(args, entry, series_obj)
 
         except Exception:
             utils.log_error_with_trace(args, "Failed to add item to history view: %s" % (json.dumps(item, indent=4)))
@@ -301,7 +252,7 @@ def show_resume_episodes(args, api: API):
     )
 
     # check for error
-    if "error" in req:
+    if not req or "error" in req:
         view.add_item(args, {"title": args.addon.getLocalizedString(30061)})
         view.end_of_directory(args)
         return False
@@ -309,63 +260,19 @@ def show_resume_episodes(args, api: API):
     num_pages = int(math.ceil(req["total"] / items_per_page))
 
     series_ids = [item.get("panel").get("episode_metadata").get("series_id") if item.get("panel") and item.get("panel").get("episode_metadata") and item.get("panel").get("episode_metadata").get("series_id") else "0" for item in req.get("data")]
-    series_data = get_series_data_from_series_ids(args, series_ids, api)
+    series_data = get_data_from_object_ids(args, series_ids, api)
 
     for item in req.get("data"):
         try:
-            # skip episodes completely that don't have at least the type information
-            # @see https://github.com/smirgol/plugin.video.crunchyroll/issues/8
-            if not item.get('panel') or not item.get('panel').get('type'):
-                continue
-
-            if item.get("panel").get("type") == "episode":
-                entry = EpisodeData(item)
-            elif item.get("panel").get("type") == "movie":
-                entry = MovieData(item)
-            else:
-                utils.crunchy_log(args, "history | unhandled index for metadata. %s" % (json.dumps(item, indent=4)),
-                                  xbmc.LOGERROR)
+            entry = get_raw_panel_from_dict(item)
+            if not entry:
                 continue
 
             series_obj = None
-            poster = entry.thumb
-            fanart = entry.fanart
             if entry.series_id:
                 series_obj = series_data.get(entry.series_id)
-                if series_obj:
-                    poster = utils.get_image_from_struct(series_obj, "poster_tall", 2)
-                    fanart = utils.get_image_from_struct(series_obj, "poster_wide", 2)
-                else:
-                    utils.log("Cannot retrieve series %s" % entry.series_id)
 
-            # add to view
-            view.add_item(
-                args,
-                {
-                    "title": entry.title,
-                    "tvshowtitle": entry.tvshowtitle,
-                    "duration": entry.duration,
-                    "playcount": entry.playcount,
-                    "season": entry.season,
-                    "episode": entry.episode,
-                    "episode_id": entry.episode_id,
-                    "collection_id": entry.collection_id,
-                    "series_id": entry.series_id,
-                    "plot": entry.plot,
-                    "plotoutline": entry.plotoutline,
-                    "genre": "",  # no longer available
-                    "year": entry.year,
-                    "aired": entry.aired,
-                    "premiered": entry.premiered,
-                    "thumb": entry.thumb,
-                    "poster": poster,
-                    "fanart": fanart,
-                    "stream_id": entry.stream_id,
-                    "playhead": entry.playhead,
-                    "mode": "videoplay"
-                },
-                is_folder=False
-            )
+            add_episode(args, entry, series_obj)
 
         except Exception:
             utils.log_error_with_trace(args, "Failed to add item to resume view: %s" % (json.dumps(item, indent=4)))
@@ -375,7 +282,48 @@ def show_resume_episodes(args, api: API):
     return True
 
 
-def get_series_data_from_series_ids(args, ids: list, api: API) -> dict:
+def add_episode(args, entry: Object, series_obj: SeriesData, add=True):
+    if not entry:
+        return
+
+    if series_obj:
+        poster = series_obj.poster
+        fanart = series_obj.fanart
+    else:
+        utils.log("Cannot retrieve series %s" % entry.series_id)
+
+    # add to view
+    return view.add_item(
+        args,
+        {
+            "title": entry.title,
+            "tvshowtitle": entry.tvshowtitle,
+            "duration": entry.duration,
+            "playcount": entry.playcount,
+            "season": entry.season,
+            "episode": entry.episode,
+            "episode_id": entry.episode_id,
+            "collection_id": entry.collection_id,
+            "series_id": entry.series_id,
+            "plot": entry.plot,
+            "plotoutline": entry.plotoutline,
+            "genre": "",  # no longer available
+            "year": entry.year,
+            "aired": entry.aired,
+            "premiered": entry.premiered,
+            "thumb": entry.thumb,
+            "poster": poster,
+            "fanart": fanart,
+            "stream_id": entry.stream_id,
+            "playhead": entry.playhead,
+            "mode": "videoplay"
+        },
+        is_folder=False,
+        add=add
+    )
+
+
+def get_data_from_object_ids(args, ids: list, api: API) -> Object:
     req = api.make_request(
         method="GET",
         url=api.OBJECTS_BY_ID_LIST_ENDPOINT.format(','.join(ids)),
@@ -387,7 +335,30 @@ def get_series_data_from_series_ids(args, ids: list, api: API) -> dict:
     if not req or "error" in req:
         return {}
 
-    return {item.get("id") : item for item in req.get("data")}
+    return {item.get("id") : get_object_data_from_dict(item) for item in req.get("data")}
+
+
+def get_raw_panel_from_dict(item: dict) -> Object:
+    if not item:
+        return None
+
+    return get_object_data_from_dict(item.get("panel"))
+
+
+def get_object_data_from_dict(raw_data: dict) -> Object:
+    if not raw_data or not raw_data.get('type'):
+        return None
+
+    if raw_data.get("type") == "episode":
+        return EpisodeData(raw_data)
+    elif raw_data.get("type") == "series":
+        return SeriesData(raw_data)
+    elif raw_data.get("type") == "movie":
+        return MovieData(raw_data)
+    else:
+        utils.crunchy_log(args, "unhandled index for metadata. %s" % (json.dumps(raw_data, indent=4)),
+                            xbmc.LOGERROR)
+        return None
 
 
 def list_seasons(args, mode, api: API):
@@ -907,8 +878,17 @@ def start_playback(args, api: API):
         xbmcgui.Dialog().ok(args.addonname, args.addon.getLocalizedString(30064))
         return False
 
+    objects = get_data_from_object_ids(args, [ args.series_id, args.episode_id ], api)
+    entry = objects.get(args.episode_id)
+    series_obj = objects.get(args.series_id)
+    if not entry:
+        return False
+
+    item = add_episode(args, entry, series_obj, add=False)
+    item.setPath(url)
+
     # prepare playback
-    item = xbmcgui.ListItem(getattr(args, "title", "Title not provided"), path=url)
+    # item = xbmcgui.ListItem(getattr(args, "title", "Title not provided"), path=url)
     item.setMimeType("application/vnd.apple.mpegurl")
     item.setContentLookup(False)
 

@@ -55,7 +55,8 @@ def add_item(
         is_folder=True,
         total_items=0,
         mediatype="video",
-        callback: Callable[[xbmcgui.ListItem], None] = None
+        callback: Callable[[xbmcgui.ListItem], None] = None,
+        add=True
 ):
     """Add item to directory listing.
     """
@@ -101,11 +102,13 @@ def add_item(
         callback(li)
 
     # add item to list
-    xbmcplugin.addDirectoryItem(handle=int(args.argv[1]),
-                                url=u,
-                                listitem=li,
-                                isFolder=is_folder,
-                                totalItems=total_items)
+    if add:
+        xbmcplugin.addDirectoryItem(handle=int(args.argv[1]),
+                                    url=u,
+                                    listitem=li,
+                                    isFolder=is_folder,
+                                    totalItems=total_items)
+    return li
 
 
 def quote_value(value):
