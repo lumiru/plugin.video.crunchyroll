@@ -217,19 +217,21 @@ class API:
             params = dict()
         if headers is None:
             headers = dict()
-        utils.log("Request: %s - Params: %s" % (url, params))
+        base_params = params.copy()
         if self.account_data:
             params.update({
                 "Policy": self.account_data.cms.policy,
                 "Signature": self.account_data.cms.signature,
                 "Key-Pair-Id": self.account_data.cms.key_pair_id
             })
-        headers.update(self.api_headers)
+        request_headers = self.api_headers.copy()
+        request_headers.update(headers)
+        utils.log("Request: %s - Params: %s - Headers: %s" % (url, base_params, request_headers))
 
         return self.http.request(
             method,
             url,
-            headers=headers,
+            headers=request_headers,
             params=params,
             data=data,
             json=json

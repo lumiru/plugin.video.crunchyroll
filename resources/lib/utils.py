@@ -21,6 +21,7 @@ import requests
 import xbmc
 import xbmcgui
 from requests import Response
+from requests.exceptions import HTTPError
 
 try:
     from urlparse import parse_qs
@@ -79,10 +80,13 @@ def get_json_from_response(r: Response) -> Optional[Dict]:
 
     # no content - possibly POST/DELETE request?
     if not r or not r.text:
-        if code >= 400:
-            raise CrunchyrollError(f"[{code}] Empty response")
-        log("Empty response data")
-        return None
+        try:
+            r.raise_for_status()
+            log("Empty response data")
+            return None
+        except HTTPError as e:
+            # r.text is empty when status code cause raise
+            r = e.response
 
     try:
         r_json: Dict = r.json()
@@ -97,7 +101,7 @@ def get_json_from_response(r: Response) -> Optional[Dict]:
     elif "message" in r_json and "code" in r_json:
         message = r_json.get("message")
         raise CrunchyrollError(f"[{code}] Error occurred: {message}")
-    if code != 200:
+    if not r.ok:
         raise CrunchyrollError(f"[{code}] {r.text}")
 
     return r_json
