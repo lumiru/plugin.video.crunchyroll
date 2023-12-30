@@ -29,7 +29,7 @@ import xbmcvfs
 from resources.lib.api import API
 from resources.lib.model import Object, Args, CrunchyrollError, PlayableItem
 from resources.lib.utils import log_error_with_trace, crunchy_log, \
-    get_playheads_from_api, get_cms_object_data_by_ids, get_listables_from_response
+    get_playheads_from_api, get_cms_object_data_by_ids, get_listables_from_response, get_upnext_episode
 
 
 class VideoPlayerStreamData(Object):
@@ -45,6 +45,7 @@ class VideoPlayerStreamData(Object):
         # PlayableItem which contains cms obj data of playable_item's parent, if exists (Episodes, not Movies). currently not used.
         self.playable_item_parent: PlayableItem | None = None
         self.token: str | None = None
+        self.next_playable_item: PlayableItem | None = None
 
 
 class VideoStream(Object):
@@ -91,35 +92,40 @@ class VideoStream(Object):
         video_player_stream_data.playheads_data = async_data.get('playheads_data')
         video_player_stream_data.playable_item = async_data.get('playable_item')
         video_player_stream_data.playable_item_parent = async_data.get('playable_item_parent')
+        video_player_stream_data.next_playable_item = async_data.get('next_playable_item')
 
         return video_player_stream_data
 
     async def _gather_async_data(self) -> Dict[str, Any]:
         """ gather data asynchronously and return them as a dictionary """
 
+        episode_id = self.args.get_arg('episode_id')
+        series_id = self.args.get_arg('series_id')
+
         # create threads
         # actually not sure if this works, as the requests lib is not async
         # also not sure if this is thread safe in any way, what if session is timed-out when starting this?
         t_stream_data = asyncio.create_task(self._get_stream_data_from_api_v2())
-        t_skip_events_data = asyncio.create_task(self._get_skip_events(self.args.get_arg('episode_id')))
-        t_playheads = asyncio.create_task(get_playheads_from_api(self.args, self.api, self.args.get_arg('episode_id')))
-        t_item_data = asyncio.create_task(
-            get_cms_object_data_by_ids(self.args, self.api, [self.args.get_arg('episode_id')]))
-        # t_item_parent_data = asyncio.create_task(get_cms_object_data_by_ids(self.args, self.api, self.args.get_arg('series_id')))
+        t_skip_events_data = asyncio.create_task(self._get_skip_events(episode_id))
+        t_playheads = asyncio.create_task(get_playheads_from_api(self.args, self.api, episode_id))
+        t_item_data = asyncio.create_task(get_cms_object_data_by_ids(self.args, self.api, [episode_id, series_id]))
+        t_upnext_data = asyncio.create_task(get_upnext_episode(self.args, episode_id, self.api))
 
         # start async requests and fetch results
-        results = await asyncio.gather(t_stream_data, t_skip_events_data, t_playheads, t_item_data)
+        results = await asyncio.gather(t_stream_data, t_skip_events_data, t_playheads, t_item_data, t_upnext_data)
 
-        playable_item = get_listables_from_response(self.args, [results[3].get(self.args.get_arg('episode_id'))]) if \
-            results[3] else None
+        listable_items = get_listables_from_response(self.args, [value for key, value in results[3].items()]) if results[3] else []
+        playable_items = [item for item in listable_items if item.id == episode_id]
+        parent_listables = [item for item in listable_items if item.id == series_id]
+        upnext_items = get_listables_from_response(self.args, [results[4]]) if results[4] else None
 
         return {
             'stream_data': results[0] or {},
             'skip_events_data': results[1] or {},
             'playheads_data': results[2] or {},
-            'playable_item': playable_item[0] if playable_item else None,
-            'playable_item_parent': None
-            # get_listables_from_response(self.args, [results[4]])[0] if results[4] else None
+            'playable_item': playable_items[0] if playable_items else None,
+            'playable_item_parent': parent_listables[0] if parent_listables else None,
+            'next_playable_item': upnext_items[0] if upnext_items else None,
         }
 
     async def _get_stream_data_from_api(self) -> Union[Dict, bool]:

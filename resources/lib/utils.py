@@ -196,6 +196,25 @@ def get_img_from_struct(item: Dict, image_type: str, depth: int = 2) -> Union[st
     return None
 
 
+async def get_upnext_episode(args, id: str, api) -> dict:
+    try:
+        req = api.make_request(
+            method="GET",
+            url=api.UPNEXT_ENDPOINT.format(id),
+            params={
+                "locale": args.subtitle,
+                # "preferred_audio_language": ""
+            }
+        )
+    except (CrunchyrollError, requests.exceptions.RequestException) as e:
+        crunchy_log(args, "get_upnext_episode: failed to load for: %s" % id)
+        return None
+    if not req or "error" in req or len(req.get("data", [])) == 0:
+        return None
+
+    return req.get("data")[0]
+
+
 def dump(data) -> None:
     xbmc.log(dumps(data, indent=4), xbmc.LOGINFO)
 
