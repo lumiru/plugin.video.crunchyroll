@@ -24,7 +24,7 @@ import xbmc
 import xbmcgui
 import xbmcplugin
 
-from resources.lib import utils
+from resources.lib import utils, view
 from resources.lib.api import API
 from resources.lib.gui import SkipModalDialog, _show_modal_dialog
 from resources.lib.model import Object, Args, CrunchyrollError
@@ -101,22 +101,7 @@ class VideoPlayer(Object):
         """ Sets up the playback"""
 
         # prepare playback
-        # note: when setting only a couple of values to the item, kodi will fetch the remaining from the url args
-        #       since we do a full overwrite of the item with data from the cms object, which does not contain all
-        #       wanted data - like playhead - we need to copy over that information to the PlayableItem before
-        #        converting it to a kodi item. be aware of this.
-
-        # copy playhead to PlayableItem (if resume is true on argv[3]) - this is required for resume capability
-        if (
-            self._stream_data.playable_item.playhead == 0
-            and self._stream_data.playheads_data.get(self._args.get_arg('episode_id'), {})
-            and self._args.argv[3] == 'resume:true'
-        ):
-            self._stream_data.playable_item.update_playcount_from_playhead(
-                self._stream_data.playheads_data.get(self._args.get_arg('episode_id'))
-            )
-
-        item = self._stream_data.playable_item.to_item(self._args)
+        item = self._prepare_xbmc_list_item()
         item.setPath(self._stream_data.stream_url)
         item.setMimeType("application/vnd.apple.mpegurl")
         item.setContentLookup(False)
@@ -148,6 +133,26 @@ class VideoPlayer(Object):
             utils.crunchy_log(self._args, "Inputstream Adaptive failed, trying directly with kodi", xbmc.LOGINFO)
             item.setProperty("inputstream", "")
             self._player.play(self._stream_data.stream_url, item)
+
+    def _prepare_xbmc_list_item(self):
+        """ Create XBMC list item from API metadata """
+
+        # note: when setting only a couple of values to the item, kodi will fetch the remaining from the url args
+        #       since we do a full overwrite of the item with data from the cms object, which does not contain all
+        #       wanted data - like playhead - we need to copy over that information to the PlayableItem before
+        #        converting it to a kodi item. be aware of this.
+
+        # copy playhead to PlayableItem (if resume is true on argv[3]) - this is required for resume capability
+        if (
+            self._stream_data.playable_item.playhead == 0
+            and self._stream_data.playheads_data.get(self._args.get_arg('episode_id'), {})
+            and self._args.argv[3] == 'resume:true'
+        ):
+            self._stream_data.playable_item.update_playcount_from_playhead(
+                self._stream_data.playheads_data.get(self._args.get_arg('episode_id'))
+            )
+
+        return self._stream_data.playable_item.to_item(self._args)
 
     def _handle_resume(self):
         """ Handles resuming and updating playhead info back to crunchyroll """
