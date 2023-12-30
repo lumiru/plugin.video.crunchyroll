@@ -792,6 +792,7 @@ def view_episodes(args, api: API):
                     "plotoutline": item["description"],
                     "aired": item["episode_air_date"][:10],
                     "premiered": item["availability_starts"][:10],  # ???
+                    "poster": args.thumb,
                     "thumb": utils.get_image_from_struct(item, "thumbnail", 2),
                     "fanart": args.fanart,
                     "mode": "videoplay",
