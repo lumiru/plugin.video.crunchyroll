@@ -66,13 +66,30 @@ def add_item(
 
         This is the old, more verbose approach. Try to use view.add_listables() for adding list items, if possible
     """
+    li = create_xbmc_item(args, info, True, mediatype, callbacks)
 
-    path_params = {}
-    path_params.update(args.args)
-    path_params.update(info)
+    # add item to list
+    xbmcplugin.addDirectoryItem(handle=int(args.argv[1]),
+                                url=li.getPath(),
+                                listitem=li,
+                                isFolder=is_folder,
+                                totalItems=total_items)
+
+    return li
+
+
+def create_xbmc_item(
+        args,
+        info,
+        is_folder=True,
+        mediatype="video",
+        callbacks: Optional[List[Callable[[xbmcgui.ListItem], None]]] = None
+) -> xbmcgui.ListItem:
+    """Create XBMC item for directory listing.
+    """
 
     # get url
-    u = build_url(args, path_params)
+    u = build_url(args, info)
 
     # create list item
     li = xbmcgui.ListItem(label=info["title"], path=u)
@@ -114,12 +131,7 @@ def add_item(
         for cb in callbacks:
             cb(li)
 
-    # add item to list
-    xbmcplugin.addDirectoryItem(handle=int(args.argv[1]),
-                                url=u,
-                                listitem=li,
-                                isFolder=is_folder,
-                                totalItems=total_items)
+    return li
 
 
 OPT_MARK_ON_WATCHLIST = 1  # highlight title if item is on watchlist
