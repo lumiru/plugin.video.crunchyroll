@@ -342,7 +342,10 @@ def get_raw_panel_from_dict(item: dict) -> Object:
     if not item:
         return None
 
-    return get_object_data_from_dict(item.get("panel"))
+    result = get_object_data_from_dict(item.get("panel"))
+    if result:
+        result.playhead = item.get("playhead", 0)
+    return result
 
 
 def get_object_data_from_dict(raw_data: dict) -> Object:
