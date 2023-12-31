@@ -15,6 +15,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import re
 import sys
 try:
     from urlparse import parse_qs
@@ -22,6 +23,7 @@ try:
 except ImportError:
     from urllib.parse import parse_qs, unquote_plus
 
+import xbmc
 import xbmcaddon
 
 
@@ -46,11 +48,57 @@ class Args(object):
         """
         self.PY2        = sys.version_info[0] == 2 #: True for Python 2
         self._argv      = argv
-        self._addonid   = self._argv[0][9:-1]
+        self._addonurl  = argv[0][0:33]
+        self._addonid   = self._addonurl[9:]
         self._addon     = xbmcaddon.Addon(id=self._addonid)
         self._addonname = self._addon.getAddonInfo("name")
         self._cj        = None
 
+        self._url       = argv[0][34:]
+        
+        xbmc.log("[PLUGIN] %s: Open URL '%s' with args %s" % (self._addonname, self._url, argv[2]), xbmc.LOGDEBUG)
+
+        self.thumb = None
+        self.poster = None
+        self.fanart = None
+
+        route = self.extract_url(self._url)
+        
+        xbmc.log("[PLUGIN] %s: extract route parameters %s" % (self._addonname, route), xbmc.LOGDEBUG)
+        
+        if route is not None:
+            for key, value in route.items():
+                if value:
+                    setattr(self, key, unquote_plus(value))
+
         for key, value in kwargs.items():
             if value:
                 setattr(self, key, unquote_plus(value[0]))
+
+    def extract_url(self, url):
+        urls = {
+            "/menu/{mode}": "mode",
+            "/menu/{mode}/offset/{offset}": "mode",
+            "/menu/{mode}/{genre}": "mode",
+            "/menu/{mode}/{genre}/offset/{offset}": "mode",
+            "/menu/{mode}/{genre}/{search}": "mode",
+            "/menu/{mode}/{genre}/{search}/offset/{offset}": "mode",
+            "/series/{series_id}": "series",
+            "/series/{series_id}/{season}/{collection_id}": "episodes",
+            "/series/{series_id}/{season}/{collection_id}/offset/{offset}": "episodes",
+            "/video/{episode_id}": "videoplay"
+        }
+
+        for pattern, mode in urls.items():
+            if pattern[0] == "/":
+                pattern = pattern[1:]
+            regexp = "^/?" + pattern.replace("{", "(?P<").replace("}", ">[^/]+)") + "$"
+            result = re.match(regexp, url)
+            if result is not None:
+                resp = result.groupdict()
+                if mode == "mode":
+                    mode = result.group("mode")
+                resp["mode"] = mode
+                return resp
+        
+        return None

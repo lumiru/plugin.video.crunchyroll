@@ -20,13 +20,14 @@ import xbmcvfs
 from os import remove
 from os.path import join
 try:
-    from urllib import urlencode
+    from urllib import urlencode, quote
 except ImportError:
-    from urllib.parse import urlencode
+    from urllib.parse import urlencode, quote
 try:
     from urllib2 import urlopen, build_opener, HTTPCookieProcessor, install_opener
 except ImportError:
     from urllib.request import urlopen, build_opener, HTTPCookieProcessor, install_opener
+from urllib.error import HTTPError
 try:
     from cookielib import LWPCookieJar
 except ImportError:
@@ -75,7 +76,7 @@ def start(args):
     # session management
     if not (args._session_id and args._auth_token):
         # create new session
-        payload = {"device_id":    args._device_id,
+        payload = {"device_id":    "args._device_id",
                    "device_type":  API.DEVICE,
                    "access_token": API.TOKEN}
         req = request(args, "start_session", payload, True)
@@ -84,6 +85,8 @@ def start(args):
         if req["error"]:
             return False
         args._session_id = req["data"]["session_id"]
+
+        xbmc.log("[PLUGIN] %s: Session API returned '%s'" % (args._addonname, str(req)), xbmc.LOGINFO)
 
         # make login
         payload = {"password": password,
@@ -98,7 +101,7 @@ def start(args):
         pass
     else:
         # restart session
-        payload = {"device_id":    args._device_id,
+        payload = {"device_id":    "args._device_id",
                    "device_type":  API.DEVICE,
                    "access_token": API.TOKEN,
                    "auth":         args._auth_token}
@@ -134,7 +137,7 @@ def destroy(args):
     args._cj = False
     try:
         remove(getCookiePath(args))
-    except WindowsError:
+    except OSError:
         pass
 
 
@@ -163,13 +166,13 @@ def request(args, method, options, failed=False):
 
     # check for error
     if json_data["error"]:
-        xbmc.log("[PLUGIN] %s: API returned error '%s'" % (args._addonname, str(json_data)), xbmc.LOGINFO)
+        xbmc.log("[PLUGIN] %s: API returned error '%s' for URL '%s'" % (args._addonname, str(json_data), url), xbmc.LOGINFO)
         args._session_restart = True
         if not failed:
             # retry request, session expired
             start(args)
             return request(args, method, options, True)
-        elif failed:
+        else:
             # destroy session
             destroy(args)
 
@@ -184,3 +187,39 @@ def getCookiePath(args):
         return join(profile_path.decode("utf-8"), u"cookies.lwp")
     else:
         return join(profile_path, "cookies.lwp")
+
+def customFanart(crId, crGuid = None, title = None, year = None):
+    """Get TV show data and fanarts from its name
+    """
+    baseUrl = "https://cloud.turp.in/fanart/?crid="
+    url = baseUrl + quote(crId)
+    if (crGuid is not None):
+        url = url + "&crguid=" + quote(title)
+    if (title is not None):
+        url = url + "&title=" + quote(title)
+    if (year is not None):
+        url = url + "&year=" + quote(year)
+    try:
+        response = urlopen(url, "".encode("utf-8"), API.TIMEOUT)
+        json_data = response.read().decode("utf-8")
+        json_data = json.loads(json_data)
+    except HTTPError as e:
+        xbmc.log("[PLUGIN] %s: API returned error for URL '%s'" % ('Crunchyroll', url), xbmc.LOGINFO)
+        raise e
+    
+    return json_data
+
+def customFanartList(crIds):
+    """Get TV shows data and fanarts from their ids
+    """
+    baseUrl = "https://cloud.turp.in/fanart/list.php?crids="
+    url = baseUrl + quote(','.join(crIds))
+    try:
+        response = urlopen(url, "".encode("utf-8"), API.TIMEOUT)
+        json_data = response.read().decode("utf-8")
+        json_data = json.loads(json_data)
+    except HTTPError as e:
+        xbmc.log("[PLUGIN] %s: API returned error for URL '%s'" % ('Crunchyroll', url), xbmc.LOGINFO)
+        raise e
+    
+    return json_data

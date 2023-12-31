@@ -36,9 +36,9 @@ def showQueue(args):
     """
     # api request
     payload = {"media_types": "anime|drama",
-               "fields":      "media.name,media.media_id,media.collection_id,media.collection_name,media.description,media.episode_number,media.created, \
-                               media.screenshot_image,media.premium_only,media.premium_available,media.available,media.premium_available,media.duration, \
-                               series.series_id,series.year,series.publisher_name,series.rating,series.genres,series.landscape_image"}
+               "fields":      "media.name,media.media_id,media.collection_id,media.collection_name,media.description,media.episode_number,media.created,\
+                               media.screenshot_image,media.premium_only,media.premium_available,media.available,media.premium_available,media.duration,\
+                               collection.season,series.series_id,series.etp_guid,series.year,series.publisher_name,series.rating,series.genres,series.landscape_image,series.portrait_image,series.name"}
     req = api.request(args, "queue", payload)
 
     # check for error
@@ -47,19 +47,27 @@ def showQueue(args):
         view.endofdirectory(args)
         return False
 
+    seriesListMetadata = api.customFanartList([item["series"]["series_id"] if "series" in item else "0" for item in req["data"]]);
+
     # display media
     for item in req["data"]:
         # video no longer available
-        if not ("most_likely_media" in item and "series" in item and item["most_likely_media"]["available"] and item["most_likely_media"]["premium_available"]):
+        if not ("most_likely_media" in item and "collection" in item and "series" in item and item["most_likely_media"]["available"] and item["most_likely_media"]["premium_available"]):
             continue
+
+        if item["series"]["series_id"] in seriesListMetadata:
+            seriesMetadata = seriesListMetadata[item["series"]["series_id"]]
+        else:
+            seriesMetadata = api.customFanart(item["series"]["series_id"], item["series"]["etp_guid"], item["series"]["name"], item["series"]["year"])
 
         # add to view
         view.add_item(args,
-                      {"title":         item["most_likely_media"]["collection_name"] + " #" + item["most_likely_media"]["episode_number"] + " - " + item["most_likely_media"]["name"],
-                       "tvshowtitle":   item["most_likely_media"]["collection_name"],
+                      {"title":         item["most_likely_media"]["name"] if item["most_likely_media"]["name"] else "Episode " + item["most_likely_media"]["episode_number"],
+                       "tvshowtitle":   item["series"]["name"],
                        "duration":      item["most_likely_media"]["duration"],
                        "playcount":     1 if (100/(float(item["most_likely_media"]["duration"])+1))*int(item["playhead"]) > 90 else 0,
-                       "episode":       item["most_likely_media"]["episode_number"],
+                       "season":        computeSeason(item["collection"]["season"]),
+                       "episode":       int(item["most_likely_media"]["episode_number"]) if item["most_likely_media"]["episode_number"].isdigit() else item["most_likely_media"]["episode_number"],
                        "episode_id":    item["most_likely_media"]["media_id"],
                        "collection_id": item["most_likely_media"]["collection_id"],
                        "series_id":     item["series"]["series_id"],
@@ -72,11 +80,14 @@ def showQueue(args):
                        "studio":        item["series"]["publisher_name"],
                        "rating":        int(item["series"]["rating"])/10.0,
                        "thumb":         (item["most_likely_media"]["screenshot_image"]["fwidestar_url"] if item["most_likely_media"]["premium_only"] else item["most_likely_media"]["screenshot_image"]["full_url"]) if item["most_likely_media"]["screenshot_image"] else "",
-                       "fanart":        item["series"]["landscape_image"]["full_url"],
+                       "poster":        item["series"]["portrait_image"]["full_url"],
+                       "fanart":        (item["most_likely_media"]["screenshot_image"]["full_url"]) if item["most_likely_media"]["screenshot_image"] else "",
+                       "clearlogo":     seriesMetadata["artworks"]["hdtvlogo"]["camo_url"] if seriesMetadata and "artworks" in seriesMetadata and "hdtvlogo" in seriesMetadata["artworks"] else "",
+                       "clearart":      seriesMetadata["artworks"]["hdclearart"]["camo_url"] if seriesMetadata and "artworks" in seriesMetadata and "hdclearart" in seriesMetadata["artworks"] else "",
                        "mode":          "videoplay"},
                       isFolder=False)
 
-    view.endofdirectory(args)
+    view.endofdirectory(args, "episodes")
     return True
 
 
@@ -96,7 +107,7 @@ def searchAnime(args):
                "q":           d,
                "limit":       30,
                "offset":      int(getattr(args, "offset", 0)),
-               "fields":      "series.name,series.series_id,series.description,series.year,series.publisher_name, \
+               "fields":      "series.name,series.series_id,series.etp_guid,series.description,series.year,series.publisher_name, \
                                series.genres,series.portrait_image,series.landscape_image"}
     req = api.request(args, "autocomplete", payload)
 
@@ -106,8 +117,15 @@ def searchAnime(args):
         view.endofdirectory(args)
         return False
 
+    seriesListMetadata = api.customFanartList([item["series_id"] for item in req["data"]]);
+
     # display media
     for item in req["data"]:
+        if item["series_id"] in seriesListMetadata:
+            seriesMetadata = seriesListMetadata[item["series_id"]]
+        else:
+            seriesMetadata = api.customFanart(item["series_id"], item["etp_guid"], item["name"], item["year"])
+ 
         # add to view
         view.add_item(args,
                       {"title":       item["name"],
@@ -118,8 +136,11 @@ def searchAnime(args):
                        "genre":       ", ".join(item["genres"]),
                        "year":        item["year"],
                        "studio":      item["publisher_name"],
-                       "thumb":       item["portrait_image"]["full_url"],
-                       "fanart":      item["landscape_image"]["full_url"],
+                       "thumb":       item["landscape_image"]["full_url"],
+                       "poster":      item["portrait_image"]["full_url"],
+                       "fanart":      seriesMetadata["artworks"]["showbackground"]["camo_url"] if seriesMetadata and "artworks" in seriesMetadata and "showbackground" in seriesMetadata["artworks"] else item["landscape_image"]["full_url"],
+                       "clearlogo":   seriesMetadata["artworks"]["hdtvlogo"]["camo_url"] if seriesMetadata and "artworks" in seriesMetadata and "hdtvlogo" in seriesMetadata["artworks"] else "",
+                       "clearart":    seriesMetadata["artworks"]["hdclearart"]["camo_url"] if seriesMetadata and "artworks" in seriesMetadata and "hdclearart" in seriesMetadata["artworks"] else "",
                        "mode":        "series"},
                       isFolder=True)
 
@@ -132,7 +153,7 @@ def searchAnime(args):
                        "mode":   args.mode},
                       isFolder=True)
 
-    view.endofdirectory(args)
+    view.endofdirectory(args, "tvshows")
     return True
 
 
@@ -143,9 +164,9 @@ def showHistory(args):
     payload = {"media_types": "anime|drama",
                "limit":       30,
                "offset":      int(getattr(args, "offset", 0)),
-               "fields":      "media.name,media.media_id,media.collection_id,media.collection_name,media.description,media.episode_number,media.created, \
-                               media.screenshot_image,media.premium_only,media.premium_available,media.available,media.premium_available,media.duration,media.playhead, \
-                               series.series_id,series.year,series.publisher_name,series.rating,series.genres,series.landscape_image"}
+               "fields":      "media.name,media.media_id,media.collection_id,media.collection_name,media.description,media.episode_number,media.created,\
+                               media.screenshot_image,media.premium_only,media.premium_available,media.available,media.premium_available,media.duration,media.playhead,\
+                               collection.season,series.series_id,series.etp_guid,series.year,series.publisher_name,series.rating,series.genres,series.landscape_image,series.portrait_image,series.name"}
     req = api.request(args, "recently_watched", payload)
 
     # check for error
@@ -154,19 +175,27 @@ def showHistory(args):
         view.endofdirectory(args)
         return False
 
+    seriesListMetadata = api.customFanartList([item["series"]["series_id"] if "series" in item else "0" for item in req["data"]]);
+
     # display media
     for item in req["data"]:
         # video no longer available
-        if not ("media" in item and "series" in item and item["media"]["available"] and item["media"]["premium_available"]):
+        if not ("media" in item and "collection" in item and "series" in item and item["media"]["available"] and item["media"]["premium_available"]):
             continue
+
+        if item["series"]["series_id"] in seriesListMetadata:
+            seriesMetadata = seriesListMetadata[item["series"]["series_id"]]
+        else:
+            seriesMetadata = api.customFanart(item["series"]["series_id"], item["series"]["etp_guid"], item["series"]["name"], item["series"]["year"])
 
         # add to view
         view.add_item(args,
-                      {"title":         item["media"]["collection_name"] + " #" + item["media"]["episode_number"] + " - " + item["media"]["name"],
-                       "tvshowtitle":   item["media"]["collection_name"],
+                      {"title":         item["media"]["name"] if item["media"]["name"] else "Episode " + item["media"]["episode_number"],
+                       "tvshowtitle":   item["series"]["name"],
                        "duration":      item["media"]["duration"],
                        "playcount":     1 if (100/(float(item["media"]["duration"])+1))*int(item["media"]["playhead"]) > 90 else 0,
-                       "episode":       item["media"]["episode_number"],
+                       "season":        computeSeason(item["collection"]["season"]),
+                       "episode":       int(item["media"]["episode_number"]) if item["media"]["episode_number"].isdigit() else item["media"]["episode_number"],
                        "episode_id":    item["media"]["media_id"],
                        "collection_id": item["media"]["collection_id"],
                        "series_id":     item["series"]["series_id"],
@@ -179,7 +208,10 @@ def showHistory(args):
                        "studio":        item["series"]["publisher_name"],
                        "rating":        int(item["series"]["rating"])/10.0,
                        "thumb":         (item["media"]["screenshot_image"]["fwidestar_url"] if item["media"]["premium_only"] else item["media"]["screenshot_image"]["full_url"]) if item["media"]["screenshot_image"] else "",
-                       "fanart":        item["series"]["landscape_image"]["full_url"],
+                       "poster":        item["series"]["portrait_image"]["full_url"],
+                       "fanart":        seriesMetadata["artworks"]["showbackground"]["camo_url"] if seriesMetadata and "artworks" in seriesMetadata and "showbackground" in seriesMetadata["artworks"] else "",
+                       "clearlogo":     seriesMetadata["artworks"]["hdtvlogo"]["camo_url"] if seriesMetadata and "artworks" in seriesMetadata and "hdtvlogo" in seriesMetadata["artworks"] else "",
+                       "clearart":      seriesMetadata["artworks"]["hdclearart"]["camo_url"] if seriesMetadata and "artworks" in seriesMetadata and "hdclearart" in seriesMetadata["artworks"] else "",
                        "mode":          "videoplay"},
                       isFolder=False)
 
@@ -191,7 +223,7 @@ def showHistory(args):
                        "mode":   args.mode},
                       isFolder=True)
 
-    view.endofdirectory(args)
+    view.endofdirectory(args, "episodes")
     return True
 
 
@@ -203,7 +235,7 @@ def listSeries(args, mode):
                "filter":     mode,
                "limit":      30,
                "offset":     int(getattr(args, "offset", 0)),
-               "fields":     "series.name,series.series_id,series.description,series.year,series.publisher_name, \
+               "fields":     "series.name,series.series_id,series.etp_guid,series.description,series.year,series.publisher_name, \
                               series.genres,series.portrait_image,series.landscape_image"}
     req = api.request(args, "list_series", payload)
 
@@ -213,8 +245,15 @@ def listSeries(args, mode):
         view.endofdirectory(args)
         return False
 
+    seriesListMetadata = api.customFanartList([item["series_id"] for item in req["data"]]);
+
     # display media
     for item in req["data"]:
+        if item["series_id"] in seriesListMetadata:
+            seriesMetadata = seriesListMetadata[item["series_id"]]
+        else:
+            seriesMetadata = api.customFanart(item["series_id"], item["etp_guid"], item["name"], item["year"])
+ 
         # add to view
         view.add_item(args,
                       {"title":       item["name"],
@@ -223,10 +262,13 @@ def listSeries(args, mode):
                        "plot":        item["description"],
                        "plotoutline": item["description"],
                        "genre":       ", ".join(item["genres"]),
-                       "year":        item["year"],
+                       "year":        seriesMetadata["year"],
                        "studio":      item["publisher_name"],
                        "thumb":       item["portrait_image"]["full_url"],
-                       "fanart":      item["landscape_image"]["full_url"],
+                       "poster":      item["portrait_image"]["full_url"],
+                       "fanart":      seriesMetadata["artworks"]["showbackground"]["camo_url"] if seriesMetadata and "artworks" in seriesMetadata and "showbackground" in seriesMetadata["artworks"] else item["landscape_image"]["full_url"],
+                       "clearlogo":   seriesMetadata["artworks"]["hdtvlogo"]["camo_url"] if seriesMetadata and "artworks" in seriesMetadata and "hdtvlogo" in seriesMetadata["artworks"] else "",
+                       "clearart":    seriesMetadata["artworks"]["hdclearart"]["camo_url"] if seriesMetadata and "artworks" in seriesMetadata and "hdclearart" in seriesMetadata["artworks"] else "",
                        "mode":        "series"},
                       isFolder=True)
 
@@ -239,7 +281,7 @@ def listSeries(args, mode):
                        "mode":   args.mode},
                       isFolder=True)
 
-    view.endofdirectory(args)
+    view.endofdirectory(args, "tvshows")
     return True
 
 
@@ -279,7 +321,7 @@ def viewSeries(args):
     # api request
     payload = {"series_id": args.series_id,
                "fields":    "collection.name,collection.collection_id,collection.description,collection.media_type,collection.created, \
-                             collection.season,collection.complete,collection.portrait_image,collection.landscape_image"}
+                             collection.season,collection.series_etp_guid,collection.complete,collection.portrait_image,collection.landscape_image"}
     req = api.request(args, "list_collections", payload)
 
     # check for error
@@ -288,13 +330,15 @@ def viewSeries(args):
         view.endofdirectory(args)
         return False
 
+    seriesMetadata = api.customFanart(args.series_id)
+
     # display media
     for item in req["data"]:
         # add to view
         view.add_item(args,
                       {"title":         item["name"],
                        "tvshowtitle":   item["name"],
-                       "season":        item["season"],
+                       "season":        computeSeason(item["season"]),
                        "collection_id": item["collection_id"],
                        "series_id":     args.series_id,
                        "plot":          item["description"],
@@ -303,12 +347,16 @@ def viewSeries(args):
                        "aired":         item["created"][:10],
                        "premiered":     item["created"][:10],
                        "status":        u"Completed" if item["complete"] else u"Continuing",
-                       "thumb":         item["portrait_image"]["full_url"] if item["portrait_image"] else args.thumb,
-                       "fanart":        item["landscape_image"]["full_url"] if item["landscape_image"] else args.fanart,
+                       "thumb":         item["portrait_image"]["full_url"] if item["portrait_image"] else seriesMetadata["artworks"]["tvthumb"]["camo_url"] if seriesMetadata and "artworks" in seriesMetadata and "tvthumb" in seriesMetadata["artworks"] else "",
+                       "poster":        item["portrait_image"]["full_url"] if item["portrait_image"] else seriesMetadata["artworks"]["tvposter"]["camo_url"] if seriesMetadata and "artworks" in seriesMetadata and "tvposter" in seriesMetadata["artworks"] else "",
+                       "fanart":        seriesMetadata["artworks"]["showbackground"]["camo_url"] if seriesMetadata and "artworks" in seriesMetadata and "showbackground" in seriesMetadata["artworks"] else item["landscape_image"]["full_url"] if item["landscape_image"] else args.fanart,
+                       "clearlogo":     seriesMetadata["artworks"]["hdtvlogo"]["camo_url"] if seriesMetadata and "artworks" in seriesMetadata and "hdtvlogo" in seriesMetadata["artworks"] else "",
+                       "clearart":      seriesMetadata["artworks"]["hdclearart"]["camo_url"] if seriesMetadata and "artworks" in seriesMetadata and "hdclearart" in seriesMetadata["artworks"] else "",
+                       "mediatype":     "season",
                        "mode":          "episodes"},
                       isFolder=True)
 
-    view.endofdirectory(args)
+    view.endofdirectory(args, "seasons")
     return True
 
 
@@ -319,7 +367,7 @@ def viewEpisodes(args):
     payload = {"collection_id": args.collection_id,
                "limit":         30,
                "offset":        int(getattr(args, "offset", 0)),
-               "fields":        "media.name,media.media_id,media.collection_id,media.collection_name,media.description,media.episode_number,media.created,media.series_id, \
+               "fields":        "media.name,media.media_id,media.collection_id,media.collection_name,media.description,media.episode_number,media.created,media.series_id,media.series_etp_guid, \
                                  media.screenshot_image,media.premium_only,media.premium_available,media.available,media.premium_available,media.duration,media.playhead"}
     req = api.request(args, "list_media", payload)
 
@@ -329,15 +377,23 @@ def viewEpisodes(args):
         view.endofdirectory(args)
         return False
 
+    seriesListMetadata = api.customFanartList([item["series_id"] for item in req["data"]]);
+
     # display media
     for item in req["data"]:
+        if item["series_id"] in seriesListMetadata:
+            seriesMetadata = seriesListMetadata[item["series_id"]]
+        else:
+            seriesMetadata = api.customFanart(item["series_id"], item["series_etp_guid"], item["collection_name"])
+
         # add to view
         view.add_item(args,
-                      {"title":         item["collection_name"] + " #" + item["episode_number"] + " - " + item["name"],
+                      {"title":         item["name"] if item["name"] else "Episode " + item["episode_number"],
                        "tvshowtitle":   item["collection_name"],
                        "duration":      item["duration"],
                        "playcount":     1 if (100/(float(item["duration"])+1))*int(item["playhead"]) > 90 else 0,
-                       "episode":       item["episode_number"],
+                       "season":        args.season,
+                       "episode":       int(item["episode_number"]) if item["episode_number"].isdigit() else item["episode_number"],
                        "episode_id":    item["media_id"],
                        "collection_id": args.collection_id,
                        "series_id":     item["series_id"],
@@ -346,7 +402,10 @@ def viewEpisodes(args):
                        "aired":         item["created"][:10],
                        "premiered":     item["created"][:10],
                        "thumb":         (item["screenshot_image"]["fwidestar_url"] if item["premium_only"] else item["screenshot_image"]["full_url"]) if item["screenshot_image"] else "",
-                       "fanart":        args.fanart,
+                       "fanart":        seriesMetadata["artworks"]["showbackground"]["camo_url"] if seriesMetadata and "artworks" in seriesMetadata and "showbackground" in seriesMetadata["artworks"] else "",
+                       "poster":        seriesMetadata["artworks"]["tvposter"]["camo_url"]  if seriesMetadata and "artworks" in seriesMetadata and "tvposter" in seriesMetadata["artworks"] else "",
+                       "clearlogo":     seriesMetadata["artworks"]["hdtvlogo"]["camo_url"] if seriesMetadata and "artworks" in seriesMetadata and "hdtvlogo" in seriesMetadata["artworks"] else "",
+                       "clearart":      seriesMetadata["artworks"]["hdclearart"]["camo_url"] if seriesMetadata and "artworks" in seriesMetadata and "hdclearart" in seriesMetadata["artworks"] else "",
                        "mode":          "videoplay"},
                       isFolder=False)
 
@@ -356,13 +415,19 @@ def viewEpisodes(args):
                       {"title":         args._addon.getLocalizedString(30044),
                        "collection_id": args.collection_id,
                        "offset":        int(getattr(args, "offset", 0)) + 30,
-                       "thumb":         args.thumb,
-                       "fanart":        args.fanart,
                        "mode":          args.mode},
                       isFolder=True)
 
-    view.endofdirectory(args)
+    view.endofdirectory(args, "episodes")
     return True
+    
+def computeSeason(seasonStr):
+    seasonResult = seasonStr
+    if seasonStr.isdigit():
+        seasonResult = int(seasonStr)
+        if seasonResult == 0:
+            seasonResult = 1
+    return seasonResult
 
 
 def startplayback(args):
@@ -370,12 +435,12 @@ def startplayback(args):
     """
     # api request
     payload = {"media_id": args.episode_id,
-               "fields":   "media.duration,media.playhead,media.stream_data"}
+               "fields":   "media.duration,media.playhead,media.stream_data,media.name"}
     req = api.request(args, "info", payload)
 
     # check for error
     if req["error"]:
-        item = xbmcgui.ListItem(getattr(args, "title", "Title not provided"))
+        item = xbmcgui.ListItem("Title not provided")
         xbmcplugin.setResolvedUrl(int(args._argv[1]), False, item)
         xbmcgui.Dialog().ok(args._addonname, args._addon.getLocalizedString(30064))
         return False
@@ -384,13 +449,13 @@ def startplayback(args):
     try:
         url = req["data"]["stream_data"]["streams"][0]["url"]
     except IndexError:
-        item = xbmcgui.ListItem(getattr(args, "title", "Title not provided"))
+        item = xbmcgui.ListItem(req["data"]["name"])
         xbmcplugin.setResolvedUrl(int(args._argv[1]), False, item)
         xbmcgui.Dialog().ok(args._addonname, args._addon.getLocalizedString(30064))
         return False
 
     # prepare playback
-    item = xbmcgui.ListItem(getattr(args, "title", "Title not provided"), path=url)
+    item = xbmcgui.ListItem(req["data"]["name"], path=url)
     item.setMimeType("application/vnd.apple.mpegurl")
     item.setContentLookup(False)
 

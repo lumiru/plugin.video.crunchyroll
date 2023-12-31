@@ -35,7 +35,10 @@ types = ["count", "size", "date", "genre", "country", "year", "episode", "season
          "lastplayed", "album", "artist", "votes", "path", "trailer", "dateadded", "mediatype", "dbid"]
 
 
-def endofdirectory(args):
+def endofdirectory(args, content_type = None):
+    if content_type is not None:
+        xbmcplugin.setContent(int(args._argv[1]), content_type)
+
     # sort methods are required in library mode
     xbmcplugin.addSortMethod(int(args._argv[1]), xbmcplugin.SORT_METHOD_NONE)
 
@@ -59,6 +62,8 @@ def add_item(args, info, isFolder=True, total_items=0, mediatype="video"):
     if isFolder:
         # directory
         infoLabels["mediatype"] = "tvshow"
+        if "mediatype" in info:
+            infoLabels["mediatype"] = info["mediatype"]
         li.setInfo(mediatype, infoLabels)
     else:
         # playable video
@@ -68,19 +73,37 @@ def add_item(args, info, isFolder=True, total_items=0, mediatype="video"):
 
         # add context menue
         cm = []
-        if u"series_id" in u:
-            cm.append((args._addon.getLocalizedString(30045), "Container.Update(%s)" % re.sub(r"(?<=mode=)[^&]*", "series", u)))
-        if u"collection_id" in u:
-            cm.append((args._addon.getLocalizedString(30046), "Container.Update(%s)" % re.sub(r"(?<=mode=)[^&]*", "episodes", u)))
+        if u"series_id" in info:
+            cm.append((args._addon.getLocalizedString(30045), "Container.Update(%s)" % build_url(args, { "mode": "series", "series_id": info["series_id"] })))
+        if u"collection_id" in info and u"season" in info:
+            cm.append((args._addon.getLocalizedString(30046), "Container.Update(%s)" % build_url(args, { "mode": "series", "series_id": info["series_id"], "season": info["season"], "collection_id": info["collection_id"] })))
         if len(cm) > 0:
             li.addContextMenuItems(cm)
 
     # set media image
-    li.setArt({"thumb":  info.get("thumb",  "DefaultFolder.png"),
-               "poster": info.get("thumb",  "DefaultFolder.png"),
-               "banner": info.get("thumb",  "DefaultFolder.png"),
-               "fanart": info.get("fanart",  xbmcvfs.translatePath(args._addon.getAddonInfo("fanart"))),
-               "icon":   info.get("thumb",  "DefaultFolder.png")})
+    artworks = {}
+    if "thumb" in info:
+        artworks["thumb"] = info["thumb"]
+    if "poster" in info:
+        artworks["poster"] = info["poster"]
+        artworks["banner"] = info["poster"]
+        artworks["icon"] = info["poster"]
+    if "clearart" in info:
+        artworks["clearart"] = info["clearart"]
+    if "clearlogo" in info:
+        artworks["clearlogo"] = info["clearlogo"]
+    if "fanart" in info:
+        artworks["fanart"] = info["fanart"]
+    li.setArt(artworks)
+
+    # set media image
+    #li.setArt({"thumb":  info.get("thumb",  "DefaultFolder.png"),
+    #           "poster": info.get("poster",  "DefaultFolder.png"),
+    #           "banner": info.get("poster",  "DefaultFolder.png"),
+    #           "clearart": info.get("clearart",  ""),
+    #           "clearlogo": info.get("clearlogo",  ""),
+    #           "fanart": info.get("fanart",  xbmcvfs.translatePath(args._addon.getAddonInfo("fanart"))),
+    #           "icon":   info.get("poster",  "DefaultFolder.png")})
 
     # add item to list
     xbmcplugin.addDirectoryItem(handle     = int(args._argv[1]),
@@ -102,22 +125,45 @@ def quote_value(value, PY2):
             value = str(value)
         return quote_plus(value)
 
+avoid_url_args = [ "mode", "title", "genre", "episode_id", "series_id", "season", "collection_id", "search" ]
+whitelist_url_args = [  ]
 
 def build_url(args, info):
     """Create url
     """
+    path = "/"
+    if "mode" in info:
+        path = "/menu/" + info["mode"]
+        if info["mode"] == "series":
+            path = "/series/" + info["series_id"]
+        elif info["mode"] == "episodes":
+            path = "/series/" + info["series_id"] + "/" + str(info["season"]) + "/" + info["collection_id"]
+        elif info["mode"] == "videoplay":
+            path = "/video/" + info["episode_id"]
+        elif "genre" in info or hasattr(args, "genre"):
+            path = path + "/" + (info["genre"] if "genre" in info else args.genre)
+            if "search" in info and info["search"]:
+                path = path + "/" + quote_value(info["search"], args.PY2)
+        if "offset" in info:
+            path = path + "/offset/" + str(info["offset"])
     s = ""
+
     # step 1 copy new information from info
     for key, value in list(info.items()):
-        if value:
+        if key in whitelist_url_args and value:
             s = s + "&" + key + "=" + quote_value(value, args.PY2)
 
     # step 2 copy old information from args, but don't append twice
     for key, value in list(args.__dict__.items()):
-        if value and key in types and not "&" + str(key) + "=" in s:
+        if key in whitelist_url_args and value and key in types and not "&" + str(key) + "=" in s:
             s = s + "&" + key + "=" + quote_value(value, args.PY2)
 
-    return args._argv[0] + "?" + s[1:]
+    if len(s) > 0:
+        s = "?" + s[1:]
+
+    result = args._addonurl + path + s
+
+    return result
 
 
 def make_infolabel(args, info):
