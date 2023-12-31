@@ -43,7 +43,7 @@ class Args(object):
         """
         self.PY2 = sys.version_info[0] == 2  #: True for Python 2
         self._argv = argv
-        self._addonurl = re.sub(r"^(plugin://[^/]+/).+$", "$1", argv[0])
+        self._addonurl = re.sub(r"^(plugin://[^/]+)/.*$", r"\1", argv[0])
         self._addonid = self._addonurl[9:]
         self._addon = xbmcaddon.Addon(id=self._addonid)
         self._addonname = self._addon.getAddonInfo("name")
