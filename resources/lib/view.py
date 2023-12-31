@@ -82,8 +82,12 @@ def create_xbmc_item(
     """Create XBMC item for directory listing.
     """
 
+    path_params = {}
+    path_params.update(args.__dict__)
+    path_params.update(info)
+
     # get url
-    u = build_url(args, info)
+    u = build_url(args, path_params)
 
     # create list item
     li = xbmcgui.ListItem(label=info["title"], path=u)
@@ -103,12 +107,12 @@ def create_xbmc_item(
 
         # add context menu
         cm = []
-        if u"series_id" in u:
+        if path_params.get("series_id"):
             cm.append((args.addon.getLocalizedString(30045),
-                       "Container.Update(%s)" % re.sub(r"(?<=mode=)[^&]*", "series", u)))
-        if u"collection_id" in u:
+                       "Container.Update(%s)" % build_url(args, path_params, "series_view")))
+        if path_params.get("collection_id"):
             cm.append((args.addon.getLocalizedString(30046),
-                       "Container.Update(%s)" % re.sub(r"(?<=mode=)[^&]*", "episodes", u)))
+                       "Container.Update(%s)" % build_url(args, path_params, "collection_view")))
         if len(cm) > 0:
             li.addContextMenuItems(cm)
 
@@ -133,14 +137,15 @@ def quote_value(value):
     return quote_plus(value)
 
 
-def build_url(args, info):
+def build_url(args, path_params, route_name: str=None):
     """Create url
     """
-    path_args = {}
-    path_args.update(args.__dict__)
-    path_args.update(info)
 
-    result = args._addonurl + router.build_path(path_args)
+    if route_name is None:
+        path = router.build_path(path_params)
+    else:
+        path = router.create_path_from_route(route_name, path_params)
+    result = args.addonurl + path
     return result
 
 
