@@ -77,7 +77,6 @@ def extract_url_params(url: str) -> Optional[dict]:
     The router logic itself.
     It iterates over routes and return params for the first found matching pattern (which should be the only one).
     """
-
     for route_name, route_conf in plugin_routes.items():
         pattern = route_conf.get("url")
         if pattern[0] == "/":
@@ -100,7 +99,6 @@ def build_path(args: dict) -> Optional[str]:
     It will use the route configuration designated by "route" arg.
     If "route" arg was not set, it will try to find a URL matching the "mode" arg and other available args.
     """
-
     route_name = args.get("route")
     if not route_name:
         route_name = find_route_matching_args(args)
@@ -113,7 +111,6 @@ def find_route_matching_args(args: dict) -> Optional[str]:
     """
     Try to get the best matching route to given "mode" arg and plugin list item args.
     """
-
     # Get all routes matching mode
     routes_matching_mode = filter_routes_by_mode(args.get("mode"))
     # Extract parameter list for each route
@@ -143,7 +140,6 @@ def create_path_from_route(route_name: str, args: dict) -> Optional[str]:
     """
     Build URL from a route name and plugin list item args.
     """
-
     # Retrieve pattern
     route = plugin_routes.get(route_name)
     if not route:

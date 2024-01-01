@@ -26,9 +26,9 @@ try:
 except ImportError:
     from urllib.parse import quote_plus
 
-import xbmcvfs
 import xbmcgui
 import xbmcplugin
+import xbmcvfs
 
 from typing import Callable, Optional, List, Dict, Any
 from . import router
@@ -88,8 +88,12 @@ def create_xbmc_item(
     """Create XBMC item for directory listing.
     """
 
+    path_params = {}
+    path_params.update(args.__dict__)
+    path_params.update(info)
+
     # get url
-    u = build_url(args, info)
+    u = build_url(args, path_params)
 
     # create list item
     li = xbmcgui.ListItem(label=info["title"], path=u)
@@ -330,7 +334,6 @@ def quote_value(value) -> str:
         value = str(value)
     return quote_plus(value)
 
-
 # Those parameters will be bypassed to URL as additional query_parameters if found in build_url path_params
 # @todo: in theory it is no longer needed, test that
 whitelist_url_args = ["duration", "playhead"]
@@ -357,7 +360,6 @@ def build_url(args, path_params: dict, route_name: str = None) -> str:
         s = "?" + s[1:]
 
     result = args.addonurl + path + s
-
     return result
 
 
