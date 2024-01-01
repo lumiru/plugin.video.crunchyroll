@@ -200,6 +200,21 @@ def get_data_from_object_ids(args, ids: list, api) -> Object:
     return {item.get("id") : get_object_data_from_dict(item) for item in req.get("data")}
 
 
+def get_upnext_episode(args, id: str, api) -> Object:
+    req = api.make_request(
+        method="GET",
+        url=api.UPNEXT_ENDPOINT.format(id),
+        params={
+            "locale": args.subtitle,
+            # "preferred_audio_language": ""
+        }
+    )
+    if not req or "error" in req or len(req.get("data", [])) == 0:
+        return None
+
+    return get_raw_panel_from_dict(req.get("data")[0])
+
+
 def get_raw_panel_from_dict(item: dict) -> Object:
     if not item:
         return None

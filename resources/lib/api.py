@@ -60,6 +60,7 @@ class API:
     RESUME_ENDPOINT = "https://beta-api.crunchyroll.com/content/v2/discover/{}/history"
     SEASONAL_TAGS_ENDPOINT = "https://beta-api.crunchyroll.com/content/v2/discover/seasonal_tags"
     CATEGORIES_ENDPOINT = "https://beta-api.crunchyroll.com/content/v1/tenant_categories"
+    UPNEXT_ENDPOINT = "https://beta-api.crunchyroll.com/content/v2/discover/up_next/{}"
     SKIP_EVENTS_ENDPOINT = "https://static.crunchyroll.com/skip-events/production/{}.json"  # requires unauthenticated request
 
     AUTHORIZATION = "Basic aHJobzlxM2F3dnNrMjJ1LXRzNWE6cHROOURteXRBU2Z6QjZvbXVsSzh6cUxzYTczVE1TY1k="
