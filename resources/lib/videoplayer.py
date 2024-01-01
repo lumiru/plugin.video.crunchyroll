@@ -24,11 +24,12 @@ import xbmc
 import xbmcgui
 import xbmcplugin
 
-from resources.lib import utils, view
-from resources.lib.api import API
-from resources.lib.gui import SkipModalDialog, _show_modal_dialog
-from resources.lib.model import Object, Args, CrunchyrollError, EpisodeData, SeriesData
-from resources.lib.videostream import VideoPlayerStreamData, VideoStream
+from . import utils, view
+from .addons import upnext
+from .api import API
+from .gui import SkipModalDialog, _show_modal_dialog
+from .model import Object, Args, CrunchyrollError, EpisodeData, SeriesData
+from .videostream import VideoPlayerStreamData, VideoStream
 
 
 class VideoPlayer(Object):
@@ -64,6 +65,7 @@ class VideoPlayer(Object):
 
         self._handle_resume()
         self._handle_skipping()
+        self._handle_upnext()
 
     def is_playing(self) -> bool:
         """ Returns true if playback is running. Note that it also returns true when paused. """
@@ -134,7 +136,17 @@ class VideoPlayer(Object):
             # start without inputstream adaptive
             utils.crunchy_log(self._args, "Inputstream Adaptive failed, trying directly with kodi", xbmc.LOGINFO)
             item.setProperty("inputstream", "")
-            xbmc.Player().play(self._stream_data.stream_url, item)
+            self._player.play(self._stream_data.stream_url, item)
+
+    def _load_playing_item_data(self):
+        """ Load episode and series data from API """
+
+        try:
+            objects = utils.get_data_from_object_ids(self._args, [ self._args.series_id, self._args.episode_id ], self._api)
+            self._episode_data = objects.get(self._args.episode_id)
+            self._series_data = objects.get(self._args.series_id)
+        except Exception:
+            utils.crunchy_log(self._args, "Unable to find video metadata from episode %s" % self._args.episode_id, xbmc.LOGINFO)
 
     def _load_playing_item_data(self):
         """ Load episode and series data from API """
@@ -213,6 +225,52 @@ class VideoPlayer(Object):
         # run thread in background to check when whe reach a section where we can skip
         utils.crunchy_log(self._args, "_handle_skipping: starting thread", xbmc.LOGINFO)
         threading.Thread(target=self.thread_check_skipping).start()
+
+    def _handle_upnext(self):
+        try:
+            if not self._episode_data:
+                return
+            next_episode = utils.get_upnext_episode(self._args, self._episode_data.episode_id, self._api)
+            if not next_episode:
+                return
+            next_url = view.build_url(
+                self._args,
+                {
+                    "series_id": self._args.series_id,
+                    "episode_id": next_episode.episode_id,
+                    "stream_id": next_episode.stream_id
+                },
+                "video_episode_play"
+            )
+            utils.log("Next URL: %s" % next_url)
+            show_next_at_seconds = self._compute_when_episode_ends()
+            upnext.send_next_info(self._args, self._episode_data, next_episode, next_url, show_next_at_seconds, self._series_data)
+        except Exception:
+            utils.crunchy_log(self._args, "Cannot send upnext notification", xbmc.LOGERROR)
+    
+    def _compute_when_episode_ends(self) -> int:
+        if not self._stream_data.skip_events_data:
+            return None
+        result = None
+        skip_events_data = self._stream_data.skip_events_data
+        if skip_events_data.get("credits") or skip_events_data.get("preview"):
+            video_end = self._episode_data.duration
+            credits_start = skip_events_data.get("credits", {}).get("start")
+            credits_end = skip_events_data.get("credits", {}).get("end")
+            preview_start = skip_events_data.get("preview", {}).get("start")
+            preview_end = skip_events_data.get("preview", {}).get("end")
+            # If there are outro and preview
+            # and if the outro ends when the preview start
+            if credits_start and credits_end and preview_start and credits_end == preview_start:
+                result = credits_start
+            # If there is a preview
+            elif preview_start:
+                result = preview_start
+            # If there is outro without preview
+            # and if the outro ends in the last 20 seconds video
+            elif credits_start and credits_end and video_end <= credits_end + 20:
+                result = credits_start
+        return result
 
     def thread_update_playhead(self):
         """ background thread to update playback with crunchyroll in intervals """
