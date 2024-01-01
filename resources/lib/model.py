@@ -469,6 +469,7 @@ class MovieData(PlayableItem):
 
         self.id = panel.get("id")
         self.title: str = meta.get("movie_listing_title", "")
+        self.name: str = data.get("movie_listing_title", "")
         self.tvshowtitle: str = meta.get("movie_listing_title", "")
         self.duration: int = int(meta.get("duration_ms", 0) / 1000)
         self.playhead: int = data.get("playhead", 0)
