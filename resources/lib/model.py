@@ -170,6 +170,7 @@ class MovieData(Object):
         meta = data.get("movie_metadata")
 
         self.title: str = meta.get("movie_listing_title", "")
+        self.name: str = data.get("movie_listing_title", "")
         self.tvshowtitle: str = meta.get("movie_listing_title", "")
         self.duration: int = int(meta.get("duration_ms", 0) / 1000)
         self.playhead: int = data.get("playhead", 0)
@@ -223,6 +224,7 @@ class EpisodeData(Object):
 
         self.title: str = utils.format_long_episode_title(meta.get("season_title"), meta.get("episode_number"),
                                                           data.get("title"))
+        self.name: str = data.get("title")
         self.tvshowtitle: str = meta.get("series_title", "")
         self.duration: int = int(meta.get("duration_ms", 0) / 1000)
         self.playhead: int = data.get("playhead", 0)
