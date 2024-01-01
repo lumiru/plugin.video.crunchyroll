@@ -27,7 +27,7 @@ import xbmcplugin
 from resources.lib import utils, view
 from resources.lib.api import API
 from resources.lib.gui import SkipModalDialog, _show_modal_dialog
-from resources.lib.model import Object, Args, CrunchyrollError
+from resources.lib.model import Object, Args, CrunchyrollError, EpisodeData, SeriesData
 from resources.lib.videostream import VideoPlayerStreamData, VideoStream
 
 
@@ -55,6 +55,7 @@ class VideoPlayer(Object):
         if self._player.isPlaying():
             utils.log("Skipping playback because already playing")
 
+        self._load_playing_item_data()
         self._prepare_and_start_playback()
 
         self._handle_resume()
@@ -133,6 +134,18 @@ class VideoPlayer(Object):
             utils.crunchy_log(self._args, "Inputstream Adaptive failed, trying directly with kodi", xbmc.LOGINFO)
             item.setProperty("inputstream", "")
             self._player.play(self._stream_data.stream_url, item)
+
+    def _load_playing_item_data(self):
+        """ Load episode and series data from API """
+
+        try:
+            objects = utils.get_data_from_object_ids(self._args, [self._args.series_id, self._args.episode_id],
+                                                     self._api)
+            self._episode_data = objects.get(self._args.episode_id)
+            self._series_data = objects.get(self._args.series_id)
+        except Exception:
+            utils.crunchy_log(self._args, "Unable to find video metadata from episode %s" % self._args.episode_id,
+                              xbmc.LOGINFO)
 
     def _prepare_xbmc_list_item(self):
         """ Create XBMC list item from API metadata """
