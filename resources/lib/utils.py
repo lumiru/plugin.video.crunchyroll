@@ -101,6 +101,9 @@ def get_json_from_response(r: Response) -> Optional[Dict]:
         })
         return d
 
+    if not r.ok and r.text[0] != "{":
+        raise CrunchyrollError(f"[{code}] {r.text}")
+
     try:
         r_json: Dict = r.json()
     except requests.exceptions.JSONDecodeError:
