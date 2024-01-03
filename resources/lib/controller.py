@@ -521,6 +521,8 @@ def view_series(args, api: API):
         view.end_of_directory(args)
         return False
 
+    series_data = utils.get_data_from_object_id(args, args.series_id, api)
+
     # display media
     for item in req["items"]:
         try:
@@ -545,8 +547,8 @@ def view_series(args, api: API):
                     "aired": None,  # item["created"][:10],
                     "premiered": None,  # item["created"][:10],
                     "status": u"Completed" if item["is_complete"] else u"Continuing",
-                    # "thumb": args.thumb,  # @todo: re-add
-                    # "fanart": args.fanart, # @todo: re-add
+                    "thumb": series_data.poster,
+                    "fanart": series_data.fanart,
                     "mode": "episodes"
                 },
                 is_folder=True
@@ -594,6 +596,8 @@ def view_episodes(args, api: API):
         }
     )
 
+    series_data = utils.get_data_from_object_id(args, args.series_id, api)
+
     # display media
     for item in req["items"]:
         try:
@@ -621,9 +625,9 @@ def view_episodes(args, api: API):
                     "plotoutline": item["description"],
                     "aired": item["episode_air_date"][:10],
                     "premiered": item["availability_starts"][:10],  # ???
-                    # "poster": args.thumb,  # @todo: re-add
+                    "poster": series_data.poster,
                     "thumb": utils.get_image_from_struct(item, "thumbnail", 2),
-                    # "fanart": args.fanart,  # @todo: re-add
+                    "fanart": series_data.fanart,
                     "mode": "videoplay",
                     # note that for fetching streams we need a special guid, not the episode_id
                     "stream_id": stream_id,
