@@ -258,6 +258,9 @@ class VideoPlayer(Object):
                             json={
                                 "playhead": int(self._player.getTime()),
                                 "content_id": self._args.episode_id
+                            },
+                            headers={
+                                'Content-Type': 'application/json'
                             }
                         )
                     except (CrunchyrollError, requests.exceptions.RequestException) as e:
