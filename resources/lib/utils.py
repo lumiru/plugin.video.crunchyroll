@@ -32,6 +32,9 @@ from typing import Dict, Union, List
 from .model import Args, CrunchyrollError, ListableItem, EpisodeData, MovieData, SeriesData, SeasonData
 from .api import API
 
+from urllib.parse import urlencode, quote
+from urllib.request import urlopen, build_opener, HTTPCookieProcessor, install_opener
+
 
 def parse(argv) -> Args:
     """Decode arguments
@@ -80,6 +83,20 @@ def get_listables_from_response(args: Args, data: List[dict]) -> List[ListableIt
                 xbmc.LOGERROR
             )
             continue
+
+    series_ids = [
+        item.series_id
+        for item in listable_items
+        if item.series_id
+    ]
+    seriesListMetadata = customFanartList(series_ids)
+
+    for item in listable_items:
+        if entry.series_id in seriesListMetadata:
+            seriesMetadata = seriesListMetadata[entry.series_id]
+            item.fanart =    seriesMetadata["artworks"]["showbackground"]["camo_url"] if seriesMetadata and "artworks" in seriesMetadata and "showbackground" in seriesMetadata["artworks"] else item.fanart,
+            item.clearlogo = seriesMetadata["artworks"]["hdtvlogo"]["camo_url"] if seriesMetadata and "artworks" in seriesMetadata and "hdtvlogo" in seriesMetadata["artworks"] else "",
+            item.clearart =  seriesMetadata["artworks"]["hdclearart"]["camo_url"] if seriesMetadata and "artworks" in seriesMetadata and "hdclearart" in seriesMetadata["artworks"] else "",
 
     return listable_items
 
@@ -313,3 +330,39 @@ def highlight_list_item_title(list_item: xbmcgui.ListItem):
         Used to highlight that item is already on watchlist
     """
     list_item.setInfo('video', {'title': '[COLOR orange]' + list_item.getLabel() + '[/COLOR]'})
+
+
+def customFanart(crGuid, title = None, year = None):
+    """Get TV show data and fanarts from its name
+    """
+    baseUrl = "https://cloud.turp.in/fanart/?crguid="
+    url = baseUrl + quote(crGuid)
+    if (title is not None):
+        url = url + "&title=" + quote(title)
+    if (year is not None):
+        url = url + "&year=" + str(year)
+    try:
+        response = urlopen(url, "".encode("utf-8"), 5)
+        json_data = response.read().decode("utf-8")
+        json_data = json.loads(json_data)
+    except HTTPError as e:
+        xbmc.log("[PLUGIN] %s: API returned error for URL '%s'" % ('Crunchyroll', url), xbmc.LOGINFO)
+        raise e
+    
+    return json_data
+
+def customFanartList(crIds):
+    """Get TV shows data and fanarts from their ids
+    """
+    baseUrl = "https://cloud.turp.in/fanart/list.php?crids="
+    url = baseUrl + quote(','.join(crIds))
+    try:
+        response = urlopen(url, "".encode("utf-8"), 5)
+        json_data = response.read().decode("utf-8")
+        json_data = json.loads(json_data)
+    except HTTPError as e:
+        xbmc.log("[PLUGIN] %s: API returned error for URL '%s'" % ('Crunchyroll', url), xbmc.LOGINFO)
+        raise e
+    
+    return json_data
+

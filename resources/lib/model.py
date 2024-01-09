@@ -194,6 +194,8 @@ class ListableItem(Object):
         self.fanart: str | None = None
         self.poster: str | None = None
         self.banner: str | None = None
+        self.clearart: str | None = None
+        self.clearlogo: str | None = None
 
     @abstractmethod
     def get_info(self, args: Args) -> Dict:
@@ -230,7 +232,9 @@ class ListableItem(Object):
             'poster': self.poster or self.thumb or 'DefaultFolder.png',
             'banner': self.thumb or 'DefaultFolder.png',
             'fanart': self.fanart or xbmcvfs.translatePath(args.addon.getAddonInfo('fanart')),
-            'icon': self.thumb or 'DefaultFolder.png'
+            'icon': self.thumb or 'DefaultFolder.png',
+            "clearart": self.clearart,
+            "clearlogo": self.clearlogo
         })
 
         return li
@@ -402,7 +406,7 @@ class EpisodeData(PlayableItem):
         meta = panel.get("episode_metadata") or panel
 
         self.id = panel.get("id")
-        self.title: str = utils.format_long_episode_title(meta.get("season_title"), meta.get("episode_number"),
+        self.title: str = utils.format_short_episode_title(meta.get("season_number"), meta.get("episode_number"),
                                                           panel.get("title"))
         self.name: str = panel.get("title", "")
         self.tvshowtitle: str = meta.get("series_title", "")
