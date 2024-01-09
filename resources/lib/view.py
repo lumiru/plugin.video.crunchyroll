@@ -125,11 +125,21 @@ def create_xbmc_item(
             li.addContextMenuItems(cm)
 
     # set media image
-    li.setArt({"thumb": info.get("thumb", "DefaultFolder.png"),
-               "poster": info.get("poster", info.get("thumb", "DefaultFolder.png")),
-               "banner": info.get("thumb", "DefaultFolder.png"),
-               "fanart": info.get("fanart", xbmcvfs.translatePath(args.addon.getAddonInfo("fanart"))),
-               "icon": info.get("thumb", "DefaultFolder.png")})
+    artworks = {}
+    if "thumb" in info:
+        artworks["thumb"] = info["thumb"]
+        artworks["fanart"] = info["thumb"]
+    if "poster" in info:
+        artworks["poster"] = info["poster"]
+        artworks["banner"] = info["poster"]
+        artworks["icon"] = info["poster"]
+    if "clearart" in info:
+        artworks["clearart"] = info["clearart"]
+    if "clearlogo" in info:
+        artworks["clearlogo"] = info["clearlogo"]
+    if "fanart" in info:
+        artworks["fanart"] = info["fanart"]
+    li.setArt(artworks)
 
     if callbacks:
         for cb in callbacks:
