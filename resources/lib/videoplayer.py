@@ -142,34 +142,33 @@ class VideoPlayer(Object):
         """ Load episode and series data from API """
 
         try:
-            objects = utils.get_data_from_object_ids(self._args, [ self._args.series_id, self._args.episode_id ], self._api)
-            self._episode_data = objects.get(self._args.episode_id)
-            self._series_data = objects.get(self._args.series_id)
+            objects = utils.get_data_from_object_ids(self._args, [ self._args.get_arg("series_id"), self._args.get_arg("episode_id") ], self._api)
+            self._episode_data = objects.get(self._args.get_arg("episode_id"))
+            self._series_data = objects.get(self._args.get_arg("series_id"))
         except Exception:
-            utils.crunchy_log(self._args, "Unable to find video metadata from episode %s" % self._args.episode_id, xbmc.LOGINFO)
+            utils.crunchy_log(self._args, "Unable to find video metadata from episode %s" % self._args.get_arg("episode_id"), xbmc.LOGINFO)
 
     def _load_playing_item_data(self):
         """ Load episode and series data from API """
 
         try:
-            objects = utils.get_data_from_object_ids(self._args, [self._args.series_id, self._args.episode_id],
+            objects = utils.get_data_from_object_ids(self._args, [self._args.get_arg("series_id"), self._args.get_arg("episode_id")],
                                                      self._api)
-            self._episode_data = objects.get(self._args.episode_id)
-            self._series_data = objects.get(self._args.series_id)
+            self._episode_data = objects.get(self._args.get_arg("episode_id"))
+            self._series_data = objects.get(self._args.get_arg("series_id"))
         except Exception:
-            utils.crunchy_log(self._args, "Unable to find video metadata from episode %s" % self._args.episode_id,
+            utils.crunchy_log(self._args, "Unable to find video metadata from episode %s" % self._args.get_arg("episode_id"),
                               xbmc.LOGINFO)
 
     def _prepare_xbmc_list_item(self):
         """ Create XBMC list item from API metadata """
 
         if not self._episode_data:
-            utils.crunchy_log(self._args, "Unable to find video metadata from episode %s" % self._args.episode_id,
+            utils.crunchy_log(self._args, "Unable to find video metadata from episode %s" % self._args.get_arg("episode_id"),
                               xbmc.LOGINFO)
             return xbmcgui.ListItem(getattr(self._args, "title", "Title not provided"))
 
         media_info = utils.create_media_info_from_objects_data(self._episode_data, self._series_data)
-        media_info["title"] = self._episode_data.name
         seriesMetadata = utils.customFanart(self._series_data.series_id, self._series_data.tvshowtitle, self._series_data.year)
         if seriesMetadata:
             media_info.update({
@@ -244,7 +243,7 @@ class VideoPlayer(Object):
             next_url = view.build_url(
                 self._args,
                 {
-                    "series_id": self._args.series_id,
+                    "series_id": self._args.get_arg("series_id"),
                     "episode_id": next_episode.episode_id,
                     "stream_id": next_episode.stream_id
                 },
