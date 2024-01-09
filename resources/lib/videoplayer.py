@@ -169,6 +169,14 @@ class VideoPlayer(Object):
             return xbmcgui.ListItem(getattr(self._args, "title", "Title not provided"))
 
         media_info = utils.create_media_info_from_objects_data(self._episode_data, self._series_data)
+        media_info["title"] = self._episode_data.name
+        seriesMetadata = utils.customFanart(self._series_data.series_id, self._series_data.tvshowtitle, self._series_data.year)
+        if seriesMetadata:
+            media_info.update({
+                "fanart":        seriesMetadata["artworks"]["showbackground"]["camo_url"] if seriesMetadata and "artworks" in seriesMetadata and "showbackground" in seriesMetadata["artworks"] else media_info.get("fanart"),
+                "clearlogo":     seriesMetadata["artworks"]["hdtvlogo"]["camo_url"] if seriesMetadata and "artworks" in seriesMetadata and "hdtvlogo" in seriesMetadata["artworks"] else "",
+                "clearart":      seriesMetadata["artworks"]["hdclearart"]["camo_url"] if seriesMetadata and "artworks" in seriesMetadata and "hdclearart" in seriesMetadata["artworks"] else "",
+            })
         return view.create_xbmc_item(self._args, media_info, False)
 
     def _handle_resume(self):
