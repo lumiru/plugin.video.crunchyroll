@@ -19,6 +19,7 @@ import sys
 from abc import abstractmethod
 from typing import Any, Dict, Union
 
+import xbmc
 import xbmcgui
 import xbmcvfs
 
