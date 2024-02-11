@@ -143,10 +143,10 @@ class VideoPlayer(Object):
         try:
             objects = utils.get_data_from_object_ids(self._args, [self._args.series_id, self._args.episode_id],
                                                      self._api)
-            self._episode_data = objects.get(self._args.episode_id)
-            self._series_data = objects.get(self._args.series_id)
+            self._episode_data = objects.get(self._args.get_arg("episode_id"))
+            self._series_data = objects.get(self._args.get_arg("series_id"))
         except Exception:
-            utils.crunchy_log(self._args, "Unable to find video metadata from episode %s" % self._args.episode_id,
+            utils.crunchy_log(self._args, "Unable to find video metadata from episode %s" % self._args.get_arg("episode_id"),
                               xbmc.LOGINFO)
 
     def _prepare_xbmc_list_item(self):
@@ -203,7 +203,7 @@ class VideoPlayer(Object):
             next_url = view.build_url(
                 self._args,
                 {
-                    "series_id": self._args.series_id,
+                    "series_id": self._args.get_arg("series_id"),
                     "episode_id": next_episode.episode_id,
                     "stream_id": next_episode.stream_id
                 },
