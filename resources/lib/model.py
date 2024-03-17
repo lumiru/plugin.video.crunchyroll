@@ -227,15 +227,21 @@ class ListableItem(Object):
                         li.setProperty('ResumeTime', str(float(getattr(self, 'playhead'))))
 
         li.setInfo('video', list_info)
-        li.setArt({
-            "thumb": self.thumb or 'DefaultFolder.png',
-            'poster': self.poster or self.thumb or 'DefaultFolder.png',
-            'banner': self.thumb or 'DefaultFolder.png',
-            'fanart': self.fanart or xbmcvfs.translatePath(args.addon.getAddonInfo('fanart')),
-            'icon': self.thumb or 'DefaultFolder.png',
-            "clearart": self.clearart,
-            "clearlogo": self.clearlogo
-        })
+        artworks = {}
+        if self.thumb is not None:
+            artworks["thumb"] = self.thumb
+            artworks["fanart"] = self.thumb
+        if self.poster is not None:
+            artworks["poster"] = self.poster
+            artworks["banner"] = self.poster
+            artworks["icon"] = self.poster
+        if self.clearart is not None:
+            artworks["clearart"] = self.clearart
+        if self.clearlogo is not None:
+            artworks["clearlogo"] = self.clearlogo
+        if self.fanart is not None:
+            artworks["fanart"] = self.fanart
+        li.setArt(artworks)
 
         return li
 

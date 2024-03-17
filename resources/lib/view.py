@@ -217,18 +217,18 @@ async def complement_listables(
             setattr(listable, 'thumb',
                     get_img_from_struct(result_obj.get('objects').get(listable.series_id), "poster_tall",
                                         2) or listable.thumb)
-            setattr(listable, 'fanart',
-                    get_img_from_struct(result_obj.get('objects').get(listable.series_id), "poster_wide",
-                                        2) or listable.fanart)
+            # setattr(listable, 'fanart',
+            #         get_img_from_struct(result_obj.get('objects').get(listable.series_id), "poster_wide",
+            #                             2) or listable.fanart)
             setattr(listable, 'poster',
                     get_img_from_struct(result_obj.get('objects').get(listable.series_id), "poster_tall",
                                         2) or listable.poster)
 
         elif isinstance(listable, EpisodeData) and listable.series_id in result_obj.get('objects'):
             # for others, only set the thumb image to a nicer one
-            setattr(listable, 'thumb',
-                    get_img_from_struct(result_obj.get('objects').get(listable.series_id), "poster_tall",
-                                        2) or listable.thumb)
+            # setattr(listable, 'thumb',
+            #         get_img_from_struct(result_obj.get('objects').get(listable.series_id), "poster_tall",
+            #                             2) or listable.thumb)
             setattr(listable, 'poster',
                     get_img_from_struct(result_obj.get('objects').get(listable.series_id), "poster_tall",
                                         2) or listable.poster)

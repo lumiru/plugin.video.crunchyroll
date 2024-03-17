@@ -92,11 +92,11 @@ def get_listables_from_response(args: Args, data: List[dict]) -> List[ListableIt
     seriesListMetadata = customFanartList(series_ids)
 
     for item in listable_items:
-        if entry.series_id in seriesListMetadata:
-            seriesMetadata = seriesListMetadata[entry.series_id]
-            item.fanart =    seriesMetadata["artworks"]["showbackground"]["camo_url"] if seriesMetadata and "artworks" in seriesMetadata and "showbackground" in seriesMetadata["artworks"] else item.fanart,
-            item.clearlogo = seriesMetadata["artworks"]["hdtvlogo"]["camo_url"] if seriesMetadata and "artworks" in seriesMetadata and "hdtvlogo" in seriesMetadata["artworks"] else "",
-            item.clearart =  seriesMetadata["artworks"]["hdclearart"]["camo_url"] if seriesMetadata and "artworks" in seriesMetadata and "hdclearart" in seriesMetadata["artworks"] else "",
+        if item.series_id in seriesListMetadata:
+            seriesMetadata = seriesListMetadata[item.series_id]
+            item.fanart =    seriesMetadata["artworks"]["showbackground"]["camo_url"] if seriesMetadata and "artworks" in seriesMetadata and "showbackground" in seriesMetadata["artworks"] else item.fanart
+            item.clearlogo = seriesMetadata["artworks"]["hdtvlogo"]["camo_url"] if seriesMetadata and "artworks" in seriesMetadata and "hdtvlogo" in seriesMetadata["artworks"] else ""
+            item.clearart =  seriesMetadata["artworks"]["hdclearart"]["camo_url"] if seriesMetadata and "artworks" in seriesMetadata and "hdclearart" in seriesMetadata["artworks"] else ""
 
     return listable_items
 
