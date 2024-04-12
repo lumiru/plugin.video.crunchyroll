@@ -94,6 +94,10 @@ def get_listables_from_response(args: Args, data: List[dict]) -> List[ListableIt
     for item in listable_items:
         if item.series_id in seriesListMetadata:
             seriesMetadata = seriesListMetadata[item.series_id]
+        elif item.series_id:
+            seriesMetadata = customFanart(item.series_id, item.tvshowtitle, item.year)
+
+        if seriesMetadata:
             item.fanart =    seriesMetadata["artworks"]["showbackground"]["camo_url"] if seriesMetadata and "artworks" in seriesMetadata and "showbackground" in seriesMetadata["artworks"] else item.fanart
             item.clearlogo = seriesMetadata["artworks"]["hdtvlogo"]["camo_url"] if seriesMetadata and "artworks" in seriesMetadata and "hdtvlogo" in seriesMetadata["artworks"] else ""
             item.clearart =  seriesMetadata["artworks"]["hdclearart"]["camo_url"] if seriesMetadata and "artworks" in seriesMetadata and "hdclearart" in seriesMetadata["artworks"] else ""
