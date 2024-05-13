@@ -34,6 +34,7 @@ from .api import API
 
 from urllib.parse import urlencode, quote
 from urllib.request import urlopen, build_opener, HTTPCookieProcessor, install_opener
+from urllib.error import HTTPError
 
 
 def parse(argv) -> Args:
