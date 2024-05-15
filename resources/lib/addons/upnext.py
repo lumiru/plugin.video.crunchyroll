@@ -41,7 +41,7 @@ class UpnextEpisode:
     def __init__(self, dto: PlayableItem, series_dto: SeriesData | None):
         self.episodeid: str | None = dto.episode_id
         self.tvshowid: str | None = dto.series_id
-        self.title: str = dto.name
+        self.title: str = dto.title_unformatted
         self.art: dict = {
             "thumb": dto.thumb,
         }

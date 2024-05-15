@@ -27,8 +27,9 @@ import xbmcplugin
 from . import utils, view
 from .addons import upnext
 from .api import API
+from .globals import G
 from .gui import SkipModalDialog, _show_modal_dialog
-from .model import Object, Args, CrunchyrollError, LoginError
+from .model import Object, CrunchyrollError, LoginError
 from .videostream import VideoPlayerStreamData, VideoStream
 
 
@@ -38,10 +39,7 @@ class VideoPlayer(Object):
     Keep instance of this class in scope, while playing, as threads started by it rely on it
     """
 
-    def __init__(self, args: Args, api: API):
-        self._args = args
-        self._api = api
-
+    def __init__(self):
         self._stream_data: VideoPlayerStreamData | None = None  # @todo: maybe rename prop and class?
         self._player: Optional[xbmc.Player] = xbmc.Player()  # @todo: what about garbage collection?
         self._skip_modal_duration_max = 10
@@ -62,6 +60,11 @@ class VideoPlayer(Object):
         self._handle_skipping()
         self._handle_upnext()
 
+        if not self._wait_for_playback_started(10):
+            utils.crunchy_log('Timeout reached, video did not start playback in 10 seconds', xbmc.LOGERROR)
+
+        self._handle_upnext()
+
     def is_playing(self) -> bool:
         """ Returns true if playback is running. Note that it also returns true when paused. """
 
@@ -79,28 +82,28 @@ class VideoPlayer(Object):
     def _get_video_stream_data(self) -> bool:
         """ Fetch all required stream data using VideoStream object """
 
-        video_stream_helper = VideoStream(self._args, self._api)
-        item = xbmcgui.ListItem(self._args.get_arg('title', 'Title not provided'))
+        video_stream_helper = VideoStream()
+        item = xbmcgui.ListItem(G.args.get_arg('title', 'Title not provided'))
 
         try:
             self._stream_data = video_stream_helper.get_player_stream_data()
             if not self._stream_data or not self._stream_data.stream_url:
-                utils.crunchy_log(self._args, "Failed to load stream info for playback", xbmc.LOGERROR)
-                xbmcplugin.setResolvedUrl(int(self._args.argv[1]), False, item)
-                xbmcgui.Dialog().ok(self._args.addon_name, self._args.addon.getLocalizedString(30064))
+                utils.crunchy_log("Failed to load stream info for playback", xbmc.LOGERROR)
+                xbmcplugin.setResolvedUrl(int(G.args.argv[1]), False, item)
+                xbmcgui.Dialog().ok(G.args.addon_name, G.args.addon.getLocalizedString(30064))
                 return False
 
         except (CrunchyrollError, requests.exceptions.RequestException) as e:
-            utils.log_error_with_trace(self._args, "Failed to prepare stream info data", False)
-            xbmcplugin.setResolvedUrl(int(self._args.argv[1]), False, item)
+            utils.log_error_with_trace("Failed to prepare stream info data", False)
+            xbmcplugin.setResolvedUrl(int(G.args.argv[1]), False, item)
 
             # check for TOO_MANY_ACTIVE_STREAMS
             if 'TOO_MANY_ACTIVE_STREAMS' in str(e):
-                xbmcgui.Dialog().ok(self._args.addon_name,
-                                    self._args.addon.getLocalizedString(30080))
+                xbmcgui.Dialog().ok(G.args.addon_name,
+                                    G.args.addon.getLocalizedString(30080))
             else:
-                xbmcgui.Dialog().ok(self._args.addon_name,
-                                    self._args.addon.getLocalizedString(30064))
+                xbmcgui.Dialog().ok(G.args.addon_name,
+                                    G.args.addon.getLocalizedString(30064))
             return False
 
         return True
@@ -117,14 +120,14 @@ class VideoPlayer(Object):
         # copy playhead to PlayableItem (if resume is true on argv[3]) - this is required for resume capability
         if (
                 self._stream_data.playable_item.playhead == 0
-                and self._stream_data.playheads_data.get(self._args.get_arg('episode_id'), {})
-                and self._args.argv[3] == 'resume:true'
+                and self._stream_data.playheads_data.get(G.args.get_arg('episode_id'), {})
+                and G.args.argv[3] == 'resume:true'
         ):
             self._stream_data.playable_item.update_playcount_from_playhead(
-                self._stream_data.playheads_data.get(self._args.get_arg('episode_id'))
+                self._stream_data.playheads_data.get(G.args.get_arg('episode_id'))
             )
 
-        item = self._stream_data.playable_item.to_item(self._args)
+        item = self._stream_data.playable_item.to_item()
         item.setPath(self._stream_data.stream_url)
         item.setMimeType('application/dash+xml')
         item.setContentLookup(False)
@@ -135,19 +138,19 @@ class VideoPlayer(Object):
         is_helper = Helper("mpd", drm='com.widevine.alpha')
         if is_helper.check_inputstream():
             manifest_headers = {
-                'User-Agent': API.CRUNCHYROLL_UA,
-                'Authorization': f"Bearer {self._api.account_data.access_token}"
+                'User-Agent': G.api.CRUNCHYROLL_UA,
+                'Authorization': f"Bearer {G.api.account_data.access_token}"
             }
             license_headers = {
-                'User-Agent': API.CRUNCHYROLL_UA,
+                'User-Agent': G.api.CRUNCHYROLL_UA,
                 'Content-Type': 'application/octet-stream',
                 'Origin': 'https://static.crunchyroll.com',
-                'Authorization': f"Bearer {self._api.account_data.access_token}",
-                'x-cr-content-id': self._args.get_arg('episode_id'),
+                'Authorization': f"Bearer {G.api.account_data.access_token}",
+                'x-cr-content-id': G.args.get_arg('episode_id'),
                 'x-cr-video-token': self._stream_data.token
             }
             license_config = {
-                'license_server_url': API.LICENSE_ENDPOINT,
+                'license_server_url': G.api.LICENSE_ENDPOINT,
                 'headers': urlencode(license_headers),
                 'post_data': 'R{SSM}',
                 'response_data': 'JBlicense'
@@ -168,7 +171,7 @@ class VideoPlayer(Object):
                 item.setSubtitles(self._stream_data.subtitle_urls)
 
             """ start playback"""
-            xbmcplugin.setResolvedUrl(int(self._args.argv[1]), True, item)
+            xbmcplugin.setResolvedUrl(int(G.args.argv[1]), True, item)
 
             # wait for playback
             # if wait_for_playback(10):
@@ -178,7 +181,7 @@ class VideoPlayer(Object):
         # start fallback
         if not wait_for_playback(10):
             # start without inputstream adaptive
-            utils.crunchy_log(self._args, "Inputstream Adaptive failed, trying directly with kodi", xbmc.LOGINFO)
+            utils.crunchy_log("Inputstream Adaptive failed, trying directly with kodi", xbmc.LOGINFO)
             item.setProperty("inputstream", "")
             self._player.play(self._stream_data.stream_url, item)
 
@@ -186,16 +189,16 @@ class VideoPlayer(Object):
         """ Handles resuming and updating playhead info back to crunchyroll """
 
         # if disabled in settings, no need to start thread
-        if self._args.addon.getSetting("sync_playtime") != "true":
+        if G.args.addon.getSetting("sync_playtime") != "true":
             return
 
         # wait for video to begin
         if not wait_for_playback(30):
-            utils.crunchy_log(self._args, 'Timeout reached, video did not start in 30 seconds', xbmc.LOGERROR)
+            utils.crunchy_log('Timeout reached, video did not start in 30 seconds', xbmc.LOGERROR)
             return
 
         # update playtime at crunchyroll in a background thread
-        utils.crunchy_log(self._args, "_handle_resume: starting sync thread", xbmc.LOGINFO)
+        utils.crunchy_log("_handle_resume: starting sync thread", xbmc.LOGINFO)
         threading.Thread(target=self.thread_update_playhead).start()
 
     def _handle_skipping(self):
@@ -203,61 +206,70 @@ class VideoPlayer(Object):
 
         # check whether we have the required data to enable this
         if not self._check_and_filter_skip_data():
-            utils.crunchy_log(self._args, "_handle_skipping: required data for skipping is empty", xbmc.LOGINFO)
+            utils.crunchy_log("_handle_skipping: required data for skipping is empty", xbmc.LOGINFO)
             return
 
         # run thread in background to check when whe reach a section where we can skip
-        utils.crunchy_log(self._args, "_handle_skipping: starting thread", xbmc.LOGINFO)
+        utils.crunchy_log("_handle_skipping: starting thread", xbmc.LOGINFO)
         threading.Thread(target=self.thread_check_skipping).start()
 
     def _handle_upnext(self):
         try:
             next_episode = self._stream_data.next_playable_item
             if not next_episode:
+                utils.crunchy_log("_handle_upnext: No episode or disabled upnext integration")
                 return
             next_url = view.build_url(
-                self._args,
                 {
-                    "series_id": self._args.get_arg("series_id"),
+                    "series_id": G.args.get_arg("series_id"),
                     "episode_id": next_episode.episode_id,
                     "stream_id": next_episode.stream_id
                 },
                 "video_episode_play"
             )
-            utils.log("Next URL: %s" % next_url)
             show_next_at_seconds = self._compute_when_episode_ends()
-            upnext.send_next_info(self._args, self._stream_data.playable_item, next_episode, next_url, show_next_at_seconds, self._stream_data.playable_item_parent)
+            # Needs to wait 1s, otherwise, upnext will show next dialog at episode start...
+            xbmc.sleep(1000)
+            utils.crunchy_log("_handle_upnext: Next URL (shown at %ds): %s" % (show_next_at_seconds, next_url))
+            upnext.send_next_info(G.args, self._stream_data.playable_item, next_episode, next_url, show_next_at_seconds, self._stream_data.playable_item_parent)
         except Exception:
-            utils.crunchy_log(self._args, "Cannot send upnext notification", xbmc.LOGERROR)
-    
+            utils.crunchy_log("_handle_upnext: Cannot send upnext notification", xbmc.LOGERROR)
+
     def _compute_when_episode_ends(self) -> int:
-        if not self._stream_data.skip_events_data:
+        upnext_mode = G.args.addon.getSetting("upnext_mode")
+        if upnext_mode == "disabled":
             return None
-        result = None
-        skip_events_data = self._stream_data.skip_events_data
-        if skip_events_data.get("credits") or skip_events_data.get("preview"):
-            video_end = self._stream_data.playable_item.duration
-            credits_start = skip_events_data.get("credits", {}).get("start")
-            credits_end = skip_events_data.get("credits", {}).get("end")
-            preview_start = skip_events_data.get("preview", {}).get("start")
-            preview_end = skip_events_data.get("preview", {}).get("end")
-            # If there are outro and preview
-            # and if the outro ends when the preview start
-            if credits_start and credits_end and preview_start and credits_end == preview_start:
-                result = credits_start
-            # If there is a preview
-            elif preview_start:
-                result = preview_start
-            # If there is outro without preview
-            # and if the outro ends in the last 20 seconds video
-            elif credits_start and credits_end and video_end <= credits_end + 20:
-                result = credits_start
+
+        video_end = self._stream_data.playable_item.duration
+        fixed_duration = int(G.args.addon.getSetting("upnext_fixed_duration"), 10)
+        result = video_end - fixed_duration
+
+        skip_events_data = self._stream_data.unmodified_skip_events_data
+        if upnext_mode == "fixed" or not skip_events_data or (not skip_events_data.get("credits") and not skip_events_data.get("preview")):
+            return result
+
+        credits_start = skip_events_data.get("credits", {}).get("start")
+        credits_end = skip_events_data.get("credits", {}).get("end")
+        preview_start = skip_events_data.get("preview", {}).get("start")
+        preview_end = skip_events_data.get("preview", {}).get("end")
+        # If there are outro and preview
+        # and if the outro ends when the preview start
+        if upnext_mode == "best" and credits_start and credits_end and preview_start and credits_end + 3 > preview_start:
+            result = credits_start
+        # If there is a preview
+        elif preview_start:
+            result = preview_start
+        # If there is outro without preview
+        # and if the outro ends in the last 20 seconds video
+        elif upnext_mode == "best" and credits_start and credits_end and video_end <= credits_end + 20:
+            result = credits_start
+
         return result
 
     def thread_update_playhead(self):
         """ background thread to update playback with crunchyroll in intervals """
 
-        utils.crunchy_log(self._args, "thread_update_playhead() started", xbmc.LOGINFO)
+        utils.crunchy_log("thread_update_playhead() started", xbmc.LOGINFO)
 
         try:
             # store playtime of last update and compare before updating, so it won't update while e.g. pausing
@@ -275,21 +287,19 @@ class VideoPlayer(Object):
                     last_updated_playtime = self._player.getTime()
                     # api request
                     update_playhead(
-                        self._args,
-                        self._api,
-                        self._args.get_arg('episode_id'),
+                        G.args.get_arg('episode_id'),
                         int(self._player.getTime())
                     )
 
         except RuntimeError:
-            utils.crunchy_log(self._args, 'Playback aborted', xbmc.LOGINFO)
+            utils.crunchy_log('Playback aborted', xbmc.LOGINFO)
 
-        utils.crunchy_log(self._args, 'thread_update_playhead() has finished', xbmc.LOGINFO)
+        utils.crunchy_log('thread_update_playhead() has finished', xbmc.LOGINFO)
 
     def thread_check_skipping(self):
         """ background thread to check and handle skipping intro/credits/... """
 
-        utils.crunchy_log(self._args, 'thread_check_skipping() started', xbmc.LOGINFO)
+        utils.crunchy_log('thread_check_skipping() started', xbmc.LOGINFO)
 
         while self._player.isPlaying() and self._stream_data.stream_url == self._player.getPlayingFile():
             # do we still have skip data left?
@@ -309,7 +319,7 @@ class VideoPlayer(Object):
 
             xbmc.sleep(1000)
 
-        utils.crunchy_log(self._args, 'thread_check_skipping() has finished', xbmc.LOGINFO)
+        utils.crunchy_log('thread_check_skipping() has finished', xbmc.LOGINFO)
 
     def _check_and_filter_skip_data(self) -> bool:
         """ check if data for skipping is present and valid for usage """
@@ -318,11 +328,11 @@ class VideoPlayer(Object):
             return False
 
         # if not enabled in config, remove from our list
-        if self._args.addon.getSetting("enable_skip_intro") != "true" and self._stream_data.skip_events_data.get(
+        if G.args.addon.getSetting("enable_skip_intro") != "true" and self._stream_data.skip_events_data.get(
                 'intro'):
             self._stream_data.skip_events_data.pop('intro', None)
 
-        if self._args.addon.getSetting("enable_skip_credits") != "true" and self._stream_data.skip_events_data.get(
+        if G.args.addon.getSetting("enable_skip_credits") != "true" and self._stream_data.skip_events_data.get(
                 'credits'):
             self._stream_data.skip_events_data.pop('credits', None)
 
@@ -331,7 +341,7 @@ class VideoPlayer(Object):
     def _ask_to_skip(self, section):
         """ Show skip modal """
 
-        utils.crunchy_log(self._args, "_ask_to_skip", xbmc.LOGINFO)
+        utils.crunchy_log("_ask_to_skip", xbmc.LOGINFO)
 
         dialog_duration = (self._stream_data.skip_events_data.get(section, []).get('end', 0) -
                            self._stream_data.skip_events_data.get(section, []).get('start', 0))
@@ -348,42 +358,51 @@ class VideoPlayer(Object):
             kwargs={
                 'seconds': dialog_duration,
                 'seek_time': self._stream_data.skip_events_data.get(section).get('end'),
-                'label': self._args.addon.getLocalizedString(30015),
-                'addon_path': self._args.addon.getAddonInfo("path"),
-                'args': self._args,
-                'api': self._api,
-                'content_id': self._args.get_arg('episode_id'),
+                'label': G.args.addon.getLocalizedString(30015),
+                'addon_path': G.args.addon.getAddonInfo("path"),
+                'content_id': G.args.get_arg('episode_id'),
             }
         ).start()
 
     def clear_active_stream(self):
-        if not self._args.get_arg('episode_id') or not self._stream_data.token:
+        if not G.args.get_arg('episode_id') or not self._stream_data or not self._stream_data.token:
             return
 
         try:
-            self._api.make_request(
+            G.api.make_request(
                 method="DELETE",
-                url=self._api.STREAMS_ENDPOINT_CLEAR_STREAM.format(self._args.get_arg('episode_id'), self._stream_data.token),
+                url=G.api.STREAMS_ENDPOINT_CLEAR_STREAM.format(G.args.get_arg('episode_id'), self._stream_data.token),
             )
         except (CrunchyrollError, LoginError, requests.exceptions.RequestException):
             # catch timeout or any other possible exception
-            utils.crunchy_log(None, "Failed to clear active stream for episode: %s" % self._args.get_arg('episode_id'))
+            utils.crunchy_log("Failed to clear active stream for episode: %s" % G.args.get_arg('episode_id'))
             return
 
-        utils.crunchy_log(None, "Cleared active stream for episode: %s" % self._args.get_arg('episode_id'))
+        utils.crunchy_log("Cleared active stream for episode: %s" % G.args.get_arg('episode_id'))
 
+    def _wait_for_playback_started(self, timeout: int = 30):
+        """ function that waits for the playback to start"""
 
-def update_playhead(args: Args, api: API, content_id: str, playhead: int):
+        timer = time.time() + timeout
+        while not self.is_playing():
+            xbmc.sleep(50)
+            # timeout to prevent infinite loop
+            if time.time() > timer:
+                return False
+
+        return True
+
+def update_playhead(content_id: str, playhead: int):
     """ Update playtime to Crunchyroll """
 
     # if sync_playtime is disabled in settings, do nothing
-    if args.addon.getSetting("sync_playtime") != "true":
+    if G.args.addon.getSetting("sync_playtime") != "true":
         return
 
     try:
-        api.make_request(
+        G.api.make_request(
             method="POST",
-            url=api.PLAYHEADS_ENDPOINT.format(api.account_data.account_id),
+            url=G.api.PLAYHEADS_ENDPOINT.format(G.api.account_data.account_id),
             json_data={
                 'playhead': playhead,
                 'content_id': content_id
@@ -395,7 +414,6 @@ def update_playhead(args: Args, api: API, content_id: str, playhead: int):
     except (CrunchyrollError, requests.exceptions.RequestException) as e:
         # catch timeout or any other possible exception
         utils.crunchy_log(
-            None,
             "Failed to update playhead to crunchyroll: %s for %s" % (
                 str(e), content_id
             )
