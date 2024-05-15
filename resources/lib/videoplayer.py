@@ -228,8 +228,8 @@ class VideoPlayer(Object):
                 "video_episode_play"
             )
             show_next_at_seconds = self._compute_when_episode_ends()
-            # Needs to wait 1s, otherwise, upnext will show next dialog at episode start...
-            xbmc.sleep(1000)
+            # Needs to wait 10s, otherwise, upnext will show next dialog at episode start...
+            xbmc.sleep(10000)
             utils.crunchy_log("_handle_upnext: Next URL (shown at %ds): %s" % (show_next_at_seconds, next_url))
             upnext.send_next_info(G.args, self._stream_data.playable_item, next_episode, next_url, show_next_at_seconds, self._stream_data.playable_item_parent)
         except Exception:
