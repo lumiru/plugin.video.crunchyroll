@@ -413,7 +413,7 @@ def customFanart(crGuid, title = None, year = None):
         json_data = json.loads(json_data)
     except HTTPError as e:
         xbmc.log("[PLUGIN] %s: API returned error for URL '%s'" % ('Crunchyroll', url), xbmc.LOGINFO)
-        raise e
+        return None
     
     return json_data
 
@@ -428,6 +428,6 @@ def customFanartList(crIds):
         json_data = json.loads(json_data)
     except HTTPError as e:
         xbmc.log("[PLUGIN] %s: API returned error for URL '%s'" % ('Crunchyroll', url), xbmc.LOGINFO)
-        raise e
+        return list()
     
     return json_data

@@ -317,8 +317,7 @@ def add_listables(
         if options & OPT_NO_SEASON_TITLE and isinstance(listable, EpisodeData):
             list_item.setInfo('video',
                               {
-                                  'title': utils.format_short_episode_title(listable.season, listable.episode,
-                                                                            listable.title_unformatted)
+                                  'title': listable.title_unformatted
                               })
 
         if len(cm) > 0:
