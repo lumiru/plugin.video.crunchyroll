@@ -259,13 +259,13 @@ class API:
             json_data=None,
             is_retry=False,
     ) -> Optional[Dict]:
+        current_time = get_date()
         if params is None:
             params = dict()
         if headers is None:
             headers = dict()
         if self.account_data:
             if expiration := self.account_data.expires:
-                current_time = get_date()
                 if current_time > str_to_date(expiration):
                     utils.crunchy_log("make_request_proposal: session renewal due to expired token", xbmc.LOGINFO)
                     self.create_session(action="refresh")
@@ -296,6 +296,8 @@ class API:
             utils.crunchy_log("make_request_proposal: request failed due to auth error", xbmc.LOGERROR)
             self.account_data.expires = date_to_str(get_date() - timedelta(seconds=1))
             return self.make_request(method, url, headers, params, data, json_data, True)
+        
+        utils.crunchy_log("make_request_proposal: request to %s completed after %s" % (url, get_date() - current_time), xbmc.LOGINFO)
 
         return get_json_from_response(r)
 
@@ -312,7 +314,7 @@ class API:
 
         req = requests.Request(method, url, data=data, params=params, headers=headers, json=json_data)
         prepped = req.prepare()
-        r = self.http.send(prepped)
+        r = self.http.send(prepped, timeout=10)
 
         return get_json_from_response(r)
 

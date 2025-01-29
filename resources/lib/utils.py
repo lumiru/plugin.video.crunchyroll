@@ -407,6 +407,8 @@ def customFanart(crGuid, title = None, year = None):
         url = url + "&title=" + quote(title)
     if (year is not None):
         url = url + "&year=" + str(year)
+    
+    current_time = datetime.utcnow()
     try:
         response = urlopen(url, "".encode("utf-8"), 5)
         json_data = response.read().decode("utf-8")
@@ -415,6 +417,7 @@ def customFanart(crGuid, title = None, year = None):
         xbmc.log("[PLUGIN] %s: API returned error for URL '%s'" % ('Crunchyroll', url), xbmc.LOGINFO)
         return None
     
+    crunchy_log("custom_fanart: request to %s completed after %s" % (url, datetime.utcnow() - current_time), xbmc.LOGINFO)
     return json_data
 
 def customFanartList(crIds):
@@ -422,6 +425,8 @@ def customFanartList(crIds):
     """
     baseUrl = "https://cloud.turp.in/fanart/list.php?crids="
     url = baseUrl + quote(','.join(crIds))
+    
+    current_time = datetime.utcnow()
     try:
         response = urlopen(url, "".encode("utf-8"), 5)
         json_data = response.read().decode("utf-8")
@@ -430,4 +435,5 @@ def customFanartList(crIds):
         xbmc.log("[PLUGIN] %s: API returned error for URL '%s'" % ('Crunchyroll', url), xbmc.LOGINFO)
         return list()
     
+    crunchy_log("custom_fanart: request to %s completed after %s" % (url, datetime.utcnow() - current_time), xbmc.LOGINFO)
     return json_data

@@ -95,9 +95,9 @@ def main(argv):
             xbmcplugin.setContent(int(G.args.argv[1]), "tvshows")
 
             return check_mode()
-        except (LoginError, CrunchyrollError):
+        except (LoginError, CrunchyrollError) as e:
             # login failed
-            utils.crunchy_log("Login failed", xbmc.LOGERROR)
+            utils.crunchy_log("Login failed: %s" % e, xbmc.LOGERROR)
             view.add_item({"title": G.args.addon.getLocalizedString(30060)})
             view.end_of_directory()
             xbmcgui.Dialog().ok(G.args.addon_name, G.args.addon.getLocalizedString(30060))

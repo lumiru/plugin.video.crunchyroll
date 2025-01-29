@@ -278,13 +278,16 @@ class ListableItem(Object):
         # if is a playable item, set some things
         if hasattr(self, 'duration'):
             li.setProperty("IsPlayable", "true")
-            li.setProperty('TotalTime', str(float(getattr(self, 'duration'))))
+            vinfo = li.getVideoInfoTag()
+            duration = float(getattr(self, 'duration'))
+            vinfo.setResumePoint(0, duration)
             # set resume if not fully watched and playhead > x
             if hasattr(self, 'playcount') and getattr(self, 'playcount') == 0:
                 if hasattr(self, 'playhead') and getattr(self, 'playhead') > 0:
-                    resume = int(getattr(self, 'playhead') / getattr(self, 'duration') * 100)
+                    playhead = float(getattr(self, 'playhead'))
+                    resume = int(playhead / duration * 100)
                     if 5 <= resume <= 90:
-                        li.setProperty('ResumeTime', str(float(getattr(self, 'playhead'))))
+                        vinfo.setResumePoint(playhead, duration)
 
         li.setInfo('video', list_info)
         artworks = {}
