@@ -97,7 +97,9 @@ def main(argv):
             return check_mode()
         except (LoginError, CrunchyrollError) as e:
             # login failed
-            utils.crunchy_log("Login failed: %s" % e, xbmc.LOGERROR)
+            utils.crunchy_log("Login failed", xbmc.LOGERROR)
+            utils.crunchy_log("If you have not changed your Crunchyroll login credentials, please download the latest app version.", xbmc.LOGINFO)
+            utils.crunchy_log("If the problem persists, please open an issue on github.", xbmc.LOGINFO)
             view.add_item({"title": G.args.addon.getLocalizedString(30060)})
             view.end_of_directory()
             xbmcgui.Dialog().ok(G.args.addon_name, G.args.addon.getLocalizedString(30060))
