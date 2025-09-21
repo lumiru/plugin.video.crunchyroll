@@ -873,6 +873,8 @@ class API:
         auth_header = request_headers.get('Authorization', 'No Auth Header')
         utils.crunchy_log(f"make_request: {method} {url} | Auth: {auth_header[:50] + '...' if len(auth_header) > 50 else auth_header}", xbmc.LOGDEBUG)
 
+        current_time = get_date()
+
         r = self.http.request(
             method,
             url,
